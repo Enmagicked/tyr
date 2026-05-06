@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/*
+ * M4 Tyr design tokens. Tailwind v4 reads these via @theme — every token
+ * here surfaces as a utility class (e.g. bg-vellum, text-ink, font-serif).
+ *
+ * Palette colors come from the design handoff. Keep this list in sync with
+ * docs/MILESTONE_4_PLAN.md §"Color tokens" — names ARE the public API for
+ * downstream components.
+ */
+@theme {
+  --color-vellum: #EFE9DB;
+  --color-ink: #1E1812;
+  --color-driftwood: #6E6358;
+  --color-thistle: #846F9C;
+  --color-marigold: #F0B85C;
+  --color-midnight: #0F1830;
+  --color-sage: #7E967A;
+  --color-clay: #C58569;
+  --color-bone: #E5DFCF;
+  --color-dune: #FAF1EA;
+  --color-paper: #FDFAF5;
+  --color-lilac-smoke: #F2EBF6;
+
+  --font-serif: var(--font-instrument-serif), Georgia, serif;
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
+
+  --animate-fade-up: fade-up 0.9s ease both;
+  --animate-fade-in: fade-in 0.8s ease both;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(28px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-vellum);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(132, 111, 156, 0.22);
+}
+
+/*
+ * Reduced-motion guard. JS hooks (useReducedMotion) handle scroll-driven
+ * animations; this CSS reset covers fade/transform animations on mount.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
