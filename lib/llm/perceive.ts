@@ -53,7 +53,9 @@ let _gemini: GoogleGenerativeAI | null = null
 let _together: OpenAI | null = null
 
 const TOGETHER_BASE_URL = 'https://api.together.xyz/v1'
-const LLAMA_MODEL = 'meta-llama/Llama-3.1-70B-Instruct-Turbo'
+// M4 deploy: Together renamed `Llama-3.1-70B-Instruct-Turbo` → prefixed with
+// `Meta-`; the un-prefixed slug now 404s. Update if Together rotates again.
+const LLAMA_MODEL = 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo'
 
 async function callOpenAI(prompt: string): Promise<{ text: string; latency_ms: number }> {
   const start = Date.now()
@@ -90,7 +92,7 @@ async function callGemini(prompt: string): Promise<{ text: string; latency_ms: n
   if (!key) throw new Error('GOOGLE_AI_API_KEY is not set')
   if (!_gemini) _gemini = new GoogleGenerativeAI(key)
   const model = _gemini.getGenerativeModel({
-    model: 'gemini-1.5-pro',
+    model: 'gemini-2.5-flash',
     generationConfig: {
       temperature: 0,
       maxOutputTokens: 600,
@@ -124,7 +126,7 @@ async function callLlama(prompt: string): Promise<{ text: string; latency_ms: nu
 const DISPATCH: Record<ModelName, (p: string) => Promise<{ text: string; latency_ms: number }>> = {
   'gpt-4o': callOpenAI,
   'claude-sonnet-4-6': callAnthropic,
-  'gemini-1.5-pro': callGemini,
+  'gemini-2.5-flash': callGemini,
   'llama-3.1-70b': callLlama,
 }
 

@@ -36,7 +36,7 @@ export async function perceiveClaude(ctx: Context): Promise<PerceiveResult[]> {
 }
 
 export async function perceiveGemini(ctx: Context): Promise<PerceiveResult[]> {
-  return perceiveAllQueries('gemini-1.5-pro', resumeText(ctx), targetContext(ctx))
+  return perceiveAllQueries('gemini-2.5-flash', resumeText(ctx), targetContext(ctx))
 }
 
 export async function perceiveLlama(ctx: Context): Promise<PerceiveResult[]> {

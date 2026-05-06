@@ -9,7 +9,8 @@
 import OpenAI from 'openai'
 
 const TOGETHER_BASE_URL = 'https://api.together.xyz/v1'
-const DEFAULT_MODEL = 'meta-llama/Llama-3.1-70B-Instruct-Turbo'
+// See lib/llm/perceive.ts for the rename note.
+const DEFAULT_MODEL = 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo'
 
 let _client: OpenAI | null = null
 function getClient(): OpenAI {

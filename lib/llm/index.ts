@@ -21,14 +21,14 @@ async function runLlama(text: string, key: PromptKey): Promise<LLMResponse> {
 const RUNNERS: Record<ModelName, (text: string, key: PromptKey) => Promise<LLMResponse>> = {
   'gpt-4o': runOpenAI,
   'claude-sonnet-4-6': runAnthropic,
-  'gemini-1.5-pro': runGemini,
+  'gemini-2.5-flash': runGemini,
   'llama-3.1-70b': runLlama,
 }
 
 export const MODELS: ModelName[] = [
   'gpt-4o',
   'claude-sonnet-4-6',
-  'gemini-1.5-pro',
+  'gemini-2.5-flash',
   'llama-3.1-70b',
 ]
 

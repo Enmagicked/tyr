@@ -14,7 +14,7 @@ export type ParserName = 'affinda' | 'openresume' | 'naive'
 export type ModelName =
   | 'gpt-4o'
   | 'claude-sonnet-4-6'
-  | 'gemini-1.5-pro'
+  | 'gemini-2.5-flash'
   | 'llama-3.1-70b'
 export type PromptKey = 'describe' | 'roles' | 'seniority' | 'skills' | 'gaps' | 'recruiter_take'
 

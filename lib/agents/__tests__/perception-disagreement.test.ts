@@ -72,7 +72,7 @@ test('perception-disagreement: 4 LLMs all answer seniority → σ computed', () 
   const results: PerceiveResult[] = [
     makeResult({ model: 'gpt-4o', query: 'seniority', scalar: 7, embedSeed: 0 }),
     makeResult({ model: 'claude-sonnet-4-6', query: 'seniority', scalar: 7, embedSeed: 0 }),
-    makeResult({ model: 'gemini-1.5-pro', query: 'seniority', scalar: 8, embedSeed: 0 }),
+    makeResult({ model: 'gemini-2.5-flash', query: 'seniority', scalar: 8, embedSeed: 0 }),
     makeResult({ model: 'llama-3.1-70b', query: 'seniority', scalar: 8, embedSeed: 0 }),
   ]
   const r = computePerceptionDisagreement(results)
@@ -87,7 +87,7 @@ test('perception-disagreement: 4 LLMs identical reasoning embeds → ρ ≈ 0', 
   const results: PerceiveResult[] = [
     makeResult({ model: 'gpt-4o', query: 'top_strengths', list: ['a'], embedSeed: 3 }),
     makeResult({ model: 'claude-sonnet-4-6', query: 'top_strengths', list: ['a'], embedSeed: 3 }),
-    makeResult({ model: 'gemini-1.5-pro', query: 'top_strengths', list: ['a'], embedSeed: 3 }),
+    makeResult({ model: 'gemini-2.5-flash', query: 'top_strengths', list: ['a'], embedSeed: 3 }),
   ]
   const r = computePerceptionDisagreement(results)
   assert.ok(r)
@@ -99,7 +99,7 @@ test('perception-disagreement: orthogonal reasoning embeds → ρ > 0', () => {
   const results: PerceiveResult[] = [
     makeResult({ model: 'gpt-4o', query: 'fit', scalar: 6, embedSeed: 0 }),
     makeResult({ model: 'claude-sonnet-4-6', query: 'fit', scalar: 6, embedSeed: 1 }),
-    makeResult({ model: 'gemini-1.5-pro', query: 'fit', scalar: 6, embedSeed: 2 }),
+    makeResult({ model: 'gemini-2.5-flash', query: 'fit', scalar: 6, embedSeed: 2 }),
   ]
   const r = computePerceptionDisagreement(results)
   assert.ok(r)
@@ -113,7 +113,7 @@ test('perception-disagreement: 2 LLMs answer one query, 4 answer another (mixed 
     makeResult({ model: 'claude-sonnet-4-6', query: 'seniority', scalar: 8, embedSeed: 1 }),
     makeResult({ model: 'gpt-4o', query: 'fit', scalar: 5, embedSeed: 0 }),
     makeResult({ model: 'claude-sonnet-4-6', query: 'fit', scalar: 7, embedSeed: 1 }),
-    makeResult({ model: 'gemini-1.5-pro', query: 'fit', scalar: 6, embedSeed: 2 }),
+    makeResult({ model: 'gemini-2.5-flash', query: 'fit', scalar: 6, embedSeed: 2 }),
     makeResult({ model: 'llama-3.1-70b', query: 'fit', scalar: 4, embedSeed: 3 }),
   ]
   const r = computePerceptionDisagreement(results)

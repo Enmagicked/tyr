@@ -12,7 +12,7 @@ export async function runGemini(resumeText: string, promptKey: PromptKey): Promi
   const start = Date.now()
 
   const model = getClient().getGenerativeModel({
-    model: 'gemini-1.5-pro',
+    model: 'gemini-2.5-flash',
     generationConfig: { temperature: 0.3, maxOutputTokens: 600 },
   })
 
@@ -20,7 +20,7 @@ export async function runGemini(resumeText: string, promptKey: PromptKey): Promi
   const text = result.response.text()
 
   return {
-    model_name: 'gemini-1.5-pro',
+    model_name: 'gemini-2.5-flash',
     prompt_key: promptKey,
     response_text: text,
     latency_ms: Date.now() - start,
