@@ -3,7 +3,23 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { extractTextFromPDF } from '@/lib/extract-text'
 
+// Single-handler try/catch so any unhandled throw becomes a JSON 500 with the
+// actual error message, instead of Vercel's HTML FUNCTION_INVOCATION_FAILED
+// page (which masks the cause and produces "Unexpected token '<'" on the client).
 export async function POST(request: Request) {
+  try {
+    return await handleUpload(request)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[upload] unhandled error:', err)
+    return NextResponse.json(
+      { error: 'Upload handler failed', detail: message },
+      { status: 500 }
+    )
+  }
+}
+
+async function handleUpload(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 

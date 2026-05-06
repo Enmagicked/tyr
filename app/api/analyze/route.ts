@@ -6,6 +6,19 @@ import { buildAnalysisGraph } from '@/lib/agents'
 import { randomUUID } from 'crypto'
 
 export async function POST(request: Request) {
+  try {
+    return await handleAnalyze(request)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[analyze] unhandled error:', err)
+    return NextResponse.json(
+      { error: 'Analyze handler failed', detail: message },
+      { status: 500 }
+    )
+  }
+}
+
+async function handleAnalyze(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
