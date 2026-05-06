@@ -60,12 +60,37 @@ async function handleUpload(request: Request) {
   const bytes = await file.arrayBuffer()
   const buffer = Buffer.from(bytes)
 
-  // Extract text before uploading so we fail fast on bad PDFs
+  // Extract text before uploading so we fail fast on bad PDFs.
+  // Surface the underlying error so encrypted/scanned/malformed PDFs are
+  // distinguishable in client and logs.
   let rawText: string
   try {
     rawText = await extractTextFromPDF(buffer)
-  } catch {
-    return NextResponse.json({ error: 'Could not extract text from PDF' }, { status: 422 })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[upload] PDF text extraction failed:', err)
+    return NextResponse.json(
+      {
+        error: 'Could not extract text from PDF',
+        detail: message,
+        hint:
+          'Most likely: scanned/image-only PDF (no embedded text), encrypted, or malformed. ' +
+          'Try a PDF exported directly from a word processor (not scanned).',
+      },
+      { status: 422 }
+    )
+  }
+  if (!rawText || rawText.trim().length < 50) {
+    return NextResponse.json(
+      {
+        error: 'PDF contained no extractable text',
+        detail: `Extracted only ${rawText?.trim().length ?? 0} characters.`,
+        hint:
+          'Likely a scanned/image-only PDF. tyr does not OCR. Re-export your resume from ' +
+          'Google Docs / Word as a fresh PDF — that bakes the text in.',
+      },
+      { status: 422 }
+    )
   }
 
   const service = createServiceClient()
