@@ -140,8 +140,8 @@ test('perceiveCacheKey: differs across model / query / text', () => {
 })
 
 test('perceiveCacheKey: namespaced under apeds:v2 (M4 bumped from v1)', () => {
-  const k = perceiveCacheKey('llama-3.1-70b', 'ai_authored', 'x')
-  assert.ok(k.startsWith('apeds:v2:llama-3.1-70b:ai_authored:'))
+  const k = perceiveCacheKey('llama-3.3-70b', 'ai_authored', 'x')
+  assert.ok(k.startsWith('apeds:v2:llama-3.3-70b:ai_authored:'))
 })
 
 test('perceiveCacheKey: same resume + different target_role → different keys (M4 acceptance #11)', () => {

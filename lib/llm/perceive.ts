@@ -53,9 +53,14 @@ let _gemini: GoogleGenerativeAI | null = null
 let _together: OpenAI | null = null
 
 const TOGETHER_BASE_URL = 'https://api.together.xyz/v1'
-// M4 deploy: Together renamed `Llama-3.1-70B-Instruct-Turbo` → prefixed with
-// `Meta-`; the un-prefixed slug now 404s. Update if Together rotates again.
-const LLAMA_MODEL = 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo'
+// Together rotates serverless availability. M4 deploy timeline:
+//   1. Original: meta-llama/Llama-3.1-70B-Instruct-Turbo → 404 (renamed)
+//   2. Renamed: meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo → 400 non-serverless
+//      (Together moved 3.1-70B to dedicated-endpoints-only)
+//   3. Current: meta-llama/Llama-3.3-70B-Instruct-Turbo → serverless ✅
+// If Together moves 3.3 too, list current Meta serverless models via
+//   curl https://api.together.xyz/v1/models | jq '.[].id' | grep -i llama
+const LLAMA_MODEL = 'meta-llama/Llama-3.3-70B-Instruct-Turbo'
 
 async function callOpenAI(prompt: string): Promise<{ text: string; latency_ms: number }> {
   const start = Date.now()
@@ -127,7 +132,7 @@ const DISPATCH: Record<ModelName, (p: string) => Promise<{ text: string; latency
   'gpt-4o': callOpenAI,
   'claude-sonnet-4-6': callAnthropic,
   'gemini-2.5-flash': callGemini,
-  'llama-3.1-70b': callLlama,
+  'llama-3.3-70b': callLlama,
 }
 
 // ---------------------------------------------------------------------------

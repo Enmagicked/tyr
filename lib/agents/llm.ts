@@ -40,7 +40,7 @@ export async function perceiveGemini(ctx: Context): Promise<PerceiveResult[]> {
 }
 
 export async function perceiveLlama(ctx: Context): Promise<PerceiveResult[]> {
-  return perceiveAllQueries('llama-3.1-70b', resumeText(ctx), targetContext(ctx))
+  return perceiveAllQueries('llama-3.3-70b', resumeText(ctx), targetContext(ctx))
 }
 
 // Adapt PerceiveResult[] back to the M1-style LLMResponse[] shape so the

@@ -15,7 +15,7 @@ export type ModelName =
   | 'gpt-4o'
   | 'claude-sonnet-4-6'
   | 'gemini-2.5-flash'
-  | 'llama-3.1-70b'
+  | 'llama-3.3-70b'
 export type PromptKey = 'describe' | 'roles' | 'seniority' | 'skills' | 'gaps' | 'recruiter_take'
 
 export interface WorkExperience {

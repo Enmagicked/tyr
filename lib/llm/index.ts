@@ -11,7 +11,7 @@ async function runLlama(text: string, key: PromptKey): Promise<LLMResponse> {
   const start = Date.now()
   const r = await callTogether(PROMPTS[key](text))
   return {
-    model_name: 'llama-3.1-70b',
+    model_name: 'llama-3.3-70b',
     prompt_key: key,
     response_text: r.text,
     latency_ms: Date.now() - start,
@@ -22,14 +22,14 @@ const RUNNERS: Record<ModelName, (text: string, key: PromptKey) => Promise<LLMRe
   'gpt-4o': runOpenAI,
   'claude-sonnet-4-6': runAnthropic,
   'gemini-2.5-flash': runGemini,
-  'llama-3.1-70b': runLlama,
+  'llama-3.3-70b': runLlama,
 }
 
 export const MODELS: ModelName[] = [
   'gpt-4o',
   'claude-sonnet-4-6',
   'gemini-2.5-flash',
-  'llama-3.1-70b',
+  'llama-3.3-70b',
 ]
 
 // Runs all 6 prompts across all 3 models (18 calls) in parallel.

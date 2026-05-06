@@ -1,4 +1,4 @@
-// Together AI client (4th LLM judge — Llama-3.1-70B-Instruct-Turbo by default).
+// Together AI client (4th LLM judge — Llama-3.3-70B-Instruct-Turbo by default).
 // Together exposes an OpenAI-compatible /v1/chat/completions endpoint, so we
 // reuse the OpenAI SDK pointed at api.together.xyz.
 //
@@ -9,8 +9,8 @@
 import OpenAI from 'openai'
 
 const TOGETHER_BASE_URL = 'https://api.together.xyz/v1'
-// See lib/llm/perceive.ts for the rename note.
-const DEFAULT_MODEL = 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo'
+// See lib/llm/perceive.ts for the rename history.
+const DEFAULT_MODEL = 'meta-llama/Llama-3.3-70B-Instruct-Turbo'
 
 let _client: OpenAI | null = null
 function getClient(): OpenAI {
