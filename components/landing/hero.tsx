@@ -125,7 +125,7 @@ export function Hero() {
             and what that gap tells you about how you will be read.
           </p>
           <div
-            className="flex gap-3 animate-fade-up"
+            className="flex gap-3 animate-fade-up flex-wrap justify-center"
             style={{ animationDelay: '0.26s' }}
           >
             <Link
@@ -133,6 +133,12 @@ export function Hero() {
               className="text-sm font-medium px-7 py-3 rounded-full bg-vellum text-ink shadow-[0_4px_28px_rgba(15,24,48,.22)] hover:scale-[1.025] hover:shadow-[0_6px_36px_rgba(15,24,48,.3)] transition-transform duration-200"
             >
               Decode my resume →
+            </Link>
+            <Link
+              href="/sample"
+              className="text-sm font-medium px-7 py-3 rounded-full border border-vellum/30 text-vellum/90 hover:bg-vellum/10 hover:text-vellum transition-colors duration-200"
+            >
+              View sample
             </Link>
           </div>
         </div>

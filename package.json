@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "bootstrap": "node --env-file=.env.local scripts/bootstrap-storage.mjs",
-    "test": "node --test --experimental-strip-types lib/parsers/__tests__/normalize.test.ts lib/parsers/__tests__/employers.test.ts lib/parsers/__tests__/determinism.test.ts lib/agents/__tests__/disagreement.test.ts lib/disagreement/__tests__/pairwise.test.ts lib/llm/__tests__/cache.test.ts lib/llm/__tests__/embed.test.ts lib/llm/__tests__/prompts.test.ts lib/llm/__tests__/perceive.test.ts lib/agents/__tests__/perception-disagreement.test.ts lib/agents/__tests__/ai-legibility.test.ts components/upload/__tests__/target-validation.test.ts lib/scroll/__tests__/easings.test.ts"
+    "sample:regen": "node --env-file=.env.local scripts/generate-sample.mjs",
+    "test": "node --test --experimental-strip-types lib/parsers/__tests__/normalize.test.ts lib/parsers/__tests__/employers.test.ts lib/parsers/__tests__/determinism.test.ts lib/parsers/__tests__/bullet-metrics.test.ts lib/agents/__tests__/disagreement.test.ts lib/disagreement/__tests__/pairwise.test.ts lib/llm/__tests__/cache.test.ts lib/llm/__tests__/embed.test.ts lib/llm/__tests__/prompts.test.ts lib/llm/__tests__/perceive.test.ts lib/agents/__tests__/perception-disagreement.test.ts lib/agents/__tests__/ai-legibility.test.ts components/upload/__tests__/target-validation.test.ts lib/scroll/__tests__/easings.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

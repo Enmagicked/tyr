@@ -1,0 +1,136 @@
+{
+  "_meta": {
+    "generated_at": "2026-05-06T00:00:00Z",
+    "source": "hand-crafted M5 placeholder. Re-generate via `npm run sample:regen` against a real synthetic resume once the prod pipeline has been exercised on one. The shape here mirrors what perception_reports + parse_disagreement + perception_query_responses produce.",
+    "synthetic_resume_summary": "Mid-level full-stack engineer, 4 years experience, two prior roles (mid-stage SaaS startup + Meta L4), targeting Senior Software Engineer at Stripe."
+  },
+  "resume": {
+    "id": "sample-00000000-0000-0000-0000-000000000000",
+    "file_name": "synthetic-resume.pdf",
+    "target_role": "Senior Software Engineer",
+    "target_company": "Stripe",
+    "created_at": "2026-05-06T00:00:00Z"
+  },
+  "parse_disagreement": {
+    "field_disagreement": {
+      "name": 0.0,
+      "email": 0.0,
+      "phone": 0.0,
+      "linkedin_url": 0.05,
+      "github_url": 0.12,
+      "personal_urls": 0.33,
+      "skills": 0.21,
+      "education": 0.0
+    },
+    "experience_alignment": 0.83,
+    "bullet_count_variance": 0.5,
+    "overall_score": 0.18,
+    "parser_pair_diffs": [
+      {
+        "parser_a": "affinda",
+        "parser_b": "openresume",
+        "field_disagreement": { "name": 0.0, "email": 0.0, "skills": 0.15 },
+        "experience_alignment": 0.9,
+        "bullet_count_diff": 1
+      },
+      {
+        "parser_a": "affinda",
+        "parser_b": "naive",
+        "field_disagreement": { "name": 0.0, "email": 0.0, "skills": 0.27 },
+        "experience_alignment": 0.85,
+        "bullet_count_diff": 2
+      },
+      {
+        "parser_a": "openresume",
+        "parser_b": "naive",
+        "field_disagreement": { "name": 0.0, "email": 0.0, "skills": 0.21 },
+        "experience_alignment": 0.75,
+        "bullet_count_diff": 0
+      }
+    ]
+  },
+  "perception": {
+    "ai_legibility_score": 71,
+    "apeds_features": {
+      "mean_seniority": 6.5,
+      "sigma_seniority": 0.5,
+      "mean_technical_depth": 7.0,
+      "sigma_technical_depth": 0.7,
+      "mean_fit": 7.2,
+      "sigma_fit": 0.4,
+      "mean_final_round_prob": 0.42,
+      "sigma_final_round_prob": 0.06,
+      "mean_ai_authored": 0.18,
+      "sigma_ai_authored": 0.05,
+      "rho_seniority": 0.12,
+      "rho_technical_depth": 0.18,
+      "rho_top_strengths": 0.31,
+      "rho_fit": 0.14,
+      "rho_final_round_probability": 0.16,
+      "rho_key_credential": 0.22,
+      "rho_missing_signal": 0.28,
+      "rho_ai_authored": 0.09,
+      "inter_modal_delta": 0.11,
+      "ats_legibility": 0.78,
+      "ats_fragility": 0.04,
+      "overall_llm_disagreement": 0.21,
+      "overall_parse_disagreement": 0.18,
+      "n_llms_responding": 4,
+      "n_parsers_responding": 3
+    },
+    "plain_summary": {
+      "ats_paragraph": "All three parsers extracted name, email, and phone identically and agreed perfectly on the education section. Disagreement clustered around personal-URL extraction (33% across parsers) and skills (21% Jaccard distance), suggesting the resume's contact block is robust but the skills section may read inconsistently to keyword-matching ATSes. ATS legibility (mean 78%) is solid; fragility (variance 0.04) is low — meaning all three parsers extracted similar fill rates, so structurally this resume is on firm ground.",
+      "experience_paragraph": "Across 11 total bullets in the two experience roles, 7 (64%) contain quantified outcomes — a healthy quantification rate that beats the rough median for engineering resumes. 9 of 11 (82%) start with strong action verbs (built, shipped, led), and only 1 contained a vague phrase ('cross-functional'). The earlier Meta L4 role had stronger quantification (5/6 bullets) than the current SaaS role (2/5) — adding numbers to the recent bullets would tighten the narrative. Mean bullet length is 142 characters, in the readable range.",
+      "ai_consensus_paragraph": "All four LLMs agreed closely on seniority (σ 0.5 — mean 6.5/10, mid-to-senior), with similar consensus on fit for Senior Software Engineer at Stripe (σ 0.4 — mean 7.2/10). Disagreement was higher on technical depth (σ 0.7) and the top-strengths list (ρ 0.31 — the four models pointed to slightly different dimensions of strength). Inter-modal δ of 0.11 means the AI judges' read of seniority is essentially aligned with the ATS-derived structural level — no wide gap between how the parsers and the LLMs see this candidate. Final-round probability mean of 42% reflects competitive but not stretched targeting.",
+      "recommendations": [
+        "Add quantified outcomes to bullets 2 and 3 of the current SaaS role — even rough numbers ('reduced page load time ~40%') anchor the bullet against AI-and-ATS readers alike. The Meta L4 bullets are a good template.",
+        "Replace 'cross-functional' (the one buzzword detected) with a concrete description of which teams collaborated and what shipped as a result — this is the kind of specificity that improves both AI readability and human signal.",
+        "The personal-URL section had highest parser disagreement (33%); audit your portfolio/scholar/blog links for consistent formatting (https:// prefix, no trailing slashes) so the parsers extract them identically."
+      ]
+    },
+    "bullet_analysis": {
+      "by_experience": [
+        {
+          "employer": "Acme SaaS Co",
+          "bullet_count": 5,
+          "metrics": {
+            "quantification": 2,
+            "action_verb": 4,
+            "buzzword": 1,
+            "char_stats": { "min": 95, "max": 180, "mean": 138, "p50": 132 }
+          }
+        },
+        {
+          "employer": "Meta",
+          "bullet_count": 6,
+          "metrics": {
+            "quantification": 5,
+            "action_verb": 5,
+            "buzzword": 0,
+            "char_stats": { "min": 110, "max": 195, "mean": 145, "p50": 142 }
+          }
+        }
+      ],
+      "aggregate": {
+        "total_bullets": 11,
+        "total_quantified": 7,
+        "total_action_verb": 9,
+        "total_buzzword": 1,
+        "pct_quantified": 0.6363636363636364,
+        "pct_action_verb": 0.8181818181818182,
+        "pct_buzzword": 0.09090909090909091,
+        "mean_chars_per_bullet": 141.81818181818181
+      },
+      "source_parser": "openresume"
+    }
+  },
+  "consensus": {
+    "top_strengths": [
+      "Quantified ownership of system-design work at scale (Meta TAO migrations)",
+      "Cross-stack range — proficient in both backend Go and frontend TypeScript",
+      "Demonstrable shipped product impact (B2B SaaS revenue retention)"
+    ],
+    "missing_signal": "No public-facing technical writing, conference talks, or open-source contributions linked from the resume — for a Senior IC role at Stripe, evidence of external technical voice is a routine signal that's currently missing.",
+    "key_credential": "Meta L4 software engineer, 2.5 years"
+  }
+}

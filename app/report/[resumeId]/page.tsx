@@ -8,7 +8,14 @@ import { PerceptionGrid } from '@/components/report/perception-grid'
 import { InterModalDelta } from '@/components/report/inter-modal-delta'
 import { ConsensusList, ConsensusText } from '@/components/report/consensus-blocks'
 import { CaveatCard } from '@/components/report/caveat-card'
+import { PlainSummarySection } from '@/components/report/plain-summary'
 import type { ApedsRawFeatures } from '@/lib/agents/perception-disagreement'
+import type { PlainSummary } from '@/lib/agents/synthesize-summary'
+import {
+  consensusList,
+  consensusText,
+  type PerceptionQueryRow,
+} from '@/lib/agents/consensus'
 
 interface PageProps {
   params: Promise<{ resumeId: string }>
@@ -32,15 +39,7 @@ interface PerceptionRow {
   apeds_features: ApedsRawFeatures | null
   ai_legibility_score: number | null
   normalization_issues: { field: string; reason: string; severity: string }[] | null
-}
-
-interface PerceptionQueryRow {
-  model_name: string
-  query_key: string
-  scalar: number | null
-  list_value: string[] | null
-  text_value: string | null
-  reasoning: string
+  plain_summary: PlainSummary | null
 }
 
 function relativeAge(createdAt: string | null): string {
@@ -54,43 +53,6 @@ function relativeAge(createdAt: string | null): string {
   if (hr < 24) return `${hr}h ago`
   const day = Math.floor(hr / 24)
   return `${day}d ago`
-}
-
-// Modal-frequency consensus across surviving LLMs. For lists we flatten and
-// pick the top-3 most-mentioned items; for text we pick the longest reasoning
-// (proxy for most-detailed). Coarse but deterministic.
-function consensusList(rows: PerceptionQueryRow[], queryKey: string): string[] | null {
-  const lists = rows
-    .filter((r) => r.query_key === queryKey && Array.isArray(r.list_value))
-    .map((r) => r.list_value!)
-  if (lists.length === 0) return null
-  const counts = new Map<string, number>()
-  for (const list of lists) {
-    for (const item of list) {
-      const k = item.trim().toLowerCase()
-      counts.set(k, (counts.get(k) ?? 0) + 1)
-    }
-  }
-  // Preserve original capitalization by remembering the first occurrence.
-  const firstOccurrence = new Map<string, string>()
-  for (const list of lists) {
-    for (const item of list) {
-      const k = item.trim().toLowerCase()
-      if (!firstOccurrence.has(k)) firstOccurrence.set(k, item.trim())
-    }
-  }
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([k]) => firstOccurrence.get(k) ?? k)
-}
-
-function consensusText(rows: PerceptionQueryRow[], queryKey: string): string | null {
-  const texts = rows
-    .filter((r) => r.query_key === queryKey && r.text_value)
-    .map((r) => r.text_value!)
-  if (texts.length === 0) return null
-  return texts.reduce((a, b) => (a.length >= b.length ? a : b))
 }
 
 export default async function ReportPage({ params }: PageProps) {
@@ -116,7 +78,7 @@ export default async function ReportPage({ params }: PageProps) {
       service.from('parse_results').select('*').eq('resume_id', resumeId),
       service
         .from('perception_reports')
-        .select('apeds_features, ai_legibility_score, normalization_issues')
+        .select('apeds_features, ai_legibility_score, normalization_issues, plain_summary')
         .eq('resume_id', resumeId)
         .maybeSingle<PerceptionRow>(),
       service
@@ -247,6 +209,11 @@ export default async function ReportPage({ params }: PageProps) {
             text={missingSignal}
             caveat="Most-detailed answer from any responding LLM."
           />
+        </section>
+
+        {/* M5: plain-English summary — narrative version of everything above */}
+        <section className="mb-10 animate-fade-up">
+          <PlainSummarySection summary={perception?.plain_summary ?? null} />
         </section>
 
         {/* Caveat */}

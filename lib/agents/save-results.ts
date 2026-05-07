@@ -8,6 +8,8 @@ import type { PerceiveResult } from '@/lib/llm/perceive'
 import type { PerceptionDisagreement } from './perception-disagreement'
 import { buildApedsFeatures, ALL_LLMS_FAILED_ISSUE } from './perception-disagreement'
 import { aiLegibilityScore } from './ai-legibility'
+import type { BulletAnalysis } from './analyze-bullets'
+import type { PlainSummary } from './synthesize-summary'
 
 // Soft dependency — runs after the aggregate nodes regardless of their outcome.
 // Fails gracefully if Supabase isn't configured.
@@ -97,6 +99,12 @@ export async function saveResults(
   const issues = perception ? perception.normalization_issues : [ALL_LLMS_FAILED_ISSUE]
   const legibility = features ? aiLegibilityScore(features) : null
 
+  // M5: bullet-level analysis + plain-English summary. Both fail-soft —
+  // null means the upstream node didn't produce a result; the report page
+  // renders graceful fallbacks.
+  const bulletAnalysis = ctx.analyze_bullets as BulletAnalysis | null | undefined
+  const plainSummary = ctx.synthesize_summary as PlainSummary | null | undefined
+
   // Always write a perception_reports row — even on all-LLMs-failed — so the
   // report page always has a row to query and the audit trail is complete.
   await supabase.from('perception_reports').upsert(
@@ -106,6 +114,8 @@ export async function saveResults(
       apeds_features: features,
       ai_legibility_score: legibility,
       normalization_issues: issues,
+      bullet_analysis: bulletAnalysis ?? null,
+      plain_summary: plainSummary ?? null,
     },
     { onConflict: 'resume_id' }
   )

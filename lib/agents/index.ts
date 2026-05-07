@@ -10,6 +10,8 @@ import {
 } from './llm'
 import { computeDisagreement } from './compute-disagreement'
 import { computePerceptionDisagreementNode } from './compute-perception-disagreement'
+import { analyzeBullets } from './analyze-bullets'
+import { synthesizeSummary } from './synthesize-summary'
 import { saveResults } from './save-results'
 
 // The full analysis graph. Adding a new signal source = adding a new node here.
@@ -88,6 +90,22 @@ export function buildAnalysisGraph(): GraphNode[] {
       fn: computePerceptionDisagreementNode,
       optional_deps: ['perceive_resume', 'compute_disagreement'],
     },
+    // --- M5: bullet-level analysis over the highest-score canonical parse ---
+    {
+      name: 'analyze_bullets',
+      fn: analyzeBullets,
+      optional_deps: ['parse_resume'],
+    },
+    // --- M5: plain-English summary (one Claude call after disagreement+bullets) ---
+    {
+      name: 'synthesize_summary',
+      fn: synthesizeSummary,
+      optional_deps: [
+        'compute_disagreement',
+        'compute_perception_disagreement',
+        'analyze_bullets',
+      ],
+    },
     // --- Persistence (runs last, fails gracefully if Supabase not configured) ---
     {
       name: 'save_results',
@@ -97,6 +115,8 @@ export function buildAnalysisGraph(): GraphNode[] {
         'perceive_resume',
         'compute_disagreement',
         'compute_perception_disagreement',
+        'analyze_bullets',
+        'synthesize_summary',
       ],
     },
   ]

@@ -1,7 +1,9 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { useScroll } from '@/lib/scroll/use-scroll'
+import { createClient } from '@/lib/supabase/client'
 
 interface LandingNavProps {
   // /upload uses the scrolled (vellum) variant from page load — the page
@@ -10,15 +12,42 @@ interface LandingNavProps {
   forceScrolledStyle?: boolean
 }
 
-const NAV_LINKS = [
+const ANON_NAV_LINKS = [
   { label: 'How it works', href: '/#how-it-works' },
   { label: 'Reports', href: '/#reports' },
   { label: 'FAQ', href: '/#faq' },
 ]
 
+const AUTHED_NAV_LINKS = [
+  { label: 'My reports', href: '/reports' },
+  { label: 'Account', href: '/account' },
+]
+
 export function LandingNav({ forceScrolledStyle = false }: LandingNavProps) {
   const scrollY = useScroll()
   const scrolled = forceScrolledStyle || scrollY > 60
+  // null = pre-mount (we don't yet know auth state); avoids server/client
+  // hydration mismatch on whichever version SSR rendered.
+  const [authed, setAuthed] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled) setAuthed(!!data.user)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!cancelled) setAuthed(!!session?.user)
+    })
+    return () => {
+      cancelled = true
+      sub?.subscription.unsubscribe()
+    }
+  }, [])
+
+  const links = authed ? AUTHED_NAV_LINKS : ANON_NAV_LINKS
+  const ctaLabel = authed ? 'Upload →' : 'Decode my resume →'
+  const ctaHref = '/upload'
 
   return (
     <nav
@@ -42,8 +71,8 @@ export function LandingNav({ forceScrolledStyle = false }: LandingNavProps) {
 
       <div className="flex items-center gap-6 md:gap-8">
         <div className="hidden md:flex items-center gap-8">
-          {NAV_LINKS.map((l) => (
-            <a
+          {links.map((l) => (
+            <Link
               key={l.label}
               href={l.href}
               className={[
@@ -52,11 +81,11 @@ export function LandingNav({ forceScrolledStyle = false }: LandingNavProps) {
               ].join(' ')}
             >
               {l.label}
-            </a>
+            </Link>
           ))}
         </div>
         <Link
-          href="/upload"
+          href={ctaHref}
           className={[
             'text-[13px] font-medium px-5 py-2 rounded-full transition-all duration-[450ms]',
             scrolled
@@ -64,7 +93,7 @@ export function LandingNav({ forceScrolledStyle = false }: LandingNavProps) {
               : 'bg-vellum text-ink hover:bg-vellum/90',
           ].join(' ')}
         >
-          Decode my resume →
+          {ctaLabel}
         </Link>
       </div>
     </nav>
