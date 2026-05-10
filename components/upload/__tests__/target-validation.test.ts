@@ -68,6 +68,47 @@ test('isValidTarget: convenience boolean wrapper matches validateTarget.ok', () 
   assert.equal(isValidTarget({ target_role: '', target_company: 'Google' }), false)
 })
 
+// ---------------------------------------------------------------------------
+// M8.B: target_jd validation (optional, soft-capped)
+// ---------------------------------------------------------------------------
+
+test('M8.B validateTarget: target_jd absent → ok, normalized.target_jd is empty string', () => {
+  const r = validateTarget({ target_role: 'SWE' })
+  assert.equal(r.ok, true)
+  assert.equal(r.normalized.target_jd, '')
+})
+
+test('M8.B validateTarget: 1-character JD → rejected (typo guard)', () => {
+  const r = validateTarget({ target_role: 'SWE', target_jd: 'A' })
+  assert.equal(r.ok, false)
+  assert.match(r.errors.target_jd!, /at least 2/)
+})
+
+test('M8.B validateTarget: realistic JD → ok, normalized strips outer whitespace', () => {
+  const jd = '  Senior Backend Engineer needed: Kafka, distributed systems, payments scale.  '
+  const r = validateTarget({ target_role: 'SWE', target_jd: jd })
+  assert.equal(r.ok, true)
+  assert.equal(r.normalized.target_jd, jd.trim())
+})
+
+test('M8.B validateTarget: 10001-char JD → rejected (over JD_MAX cap)', () => {
+  const r = validateTarget({ target_role: 'SWE', target_jd: 'a'.repeat(10_001) })
+  assert.equal(r.ok, false)
+  assert.match(r.errors.target_jd!, /under/)
+})
+
+test('M8.B validateTarget: at the 10K boundary → ok', () => {
+  const r = validateTarget({ target_role: 'SWE', target_jd: 'a'.repeat(10_000) })
+  assert.equal(r.ok, true)
+})
+
+test('M8.B isValidTarget: JD is independent of role validity', () => {
+  // Bad JD blocks even with good role
+  assert.equal(isValidTarget({ target_role: 'SWE', target_jd: 'A' }), false)
+  // Good JD with bad role still blocked by role
+  assert.equal(isValidTarget({ target_role: '', target_jd: 'plenty of text here' }), false)
+})
+
 test('COMMON_ROLES: contains expected candidate-population staples', () => {
   assert.ok(COMMON_ROLES.includes('Software Engineer'))
   assert.ok(COMMON_ROLES.includes('Investment Banking Analyst'))

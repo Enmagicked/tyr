@@ -6,6 +6,10 @@
 export interface TargetInput {
   target_role: string
   target_company: string
+  // M8.B: optional job-description text. When provided, plumbs through to the
+  // fit / top_strengths / missing_signal perception queries so the LLMs read
+  // the resume against actual JD requirements, not just the role title.
+  target_jd: string
 }
 
 export interface TargetValidation {
@@ -17,10 +21,15 @@ export interface TargetValidation {
 
 const MIN = 2
 const MAX = 80
+// M8.B: JD soft cap. ~10K chars ≈ 2 pages dense JD text — plenty for any
+// realistic posting. Above this we reject; truncating silently would mask
+// part of the JD the model never sees.
+export const JD_MAX = 10_000
 
 export function validateTarget(raw: Partial<TargetInput>): TargetValidation {
   const role = (raw.target_role ?? '').trim()
   const company = (raw.target_company ?? '').trim()
+  const jd = (raw.target_jd ?? '').trim()
   const errors: TargetValidation['errors'] = {}
 
   if (role.length < MIN) errors.target_role = 'Role must be at least 2 characters'
@@ -33,10 +42,18 @@ export function validateTarget(raw: Partial<TargetInput>): TargetValidation {
   else if (company.length > MAX)
     errors.target_company = `Company must be under ${MAX} characters`
 
+  // M8.B: JD is optional. Empty is fine; any non-empty JD must be ≥ MIN chars
+  // and ≤ JD_MAX. A 1-char JD is a typo; > JD_MAX is too long to feed every
+  // model on every query without burning the context budget.
+  if (jd.length > 0 && jd.length < MIN)
+    errors.target_jd = 'Job description must be at least 2 characters'
+  else if (jd.length > JD_MAX)
+    errors.target_jd = `Job description must be under ${JD_MAX.toLocaleString()} characters`
+
   return {
     ok: Object.keys(errors).length === 0,
     errors,
-    normalized: { target_role: role, target_company: company },
+    normalized: { target_role: role, target_company: company, target_jd: jd },
   }
 }
 

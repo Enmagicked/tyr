@@ -33,6 +33,10 @@ export type PerceptionQueryShape = 'scalar' | 'list' | 'text'
 export interface PerceptionQueryContext {
   target_role?: string | null
   target_company?: string | null
+  // M8: optional job-description text. When present, extends the fit /
+  // top_strengths / missing_signal prompts with a JD-grounded branch so the
+  // models read the resume against actual requirements, not just a role title.
+  target_jd?: string | null
 }
 
 export interface PerceptionQuerySpec {
@@ -63,9 +67,22 @@ Always return ONLY a JSON object matching the schema requested. Always emit the 
 
 const RESUME_OPEN = '<resume_text>'
 const RESUME_CLOSE = '</resume_text>'
+const JD_OPEN = '<job_description>'
+const JD_CLOSE = '</job_description>'
 
 function wrapResume(t: string): string {
   return `${RESUME_OPEN}\n${t}\n${RESUME_CLOSE}`
+}
+
+// M8: when a JD is supplied, returns a delimited block to prepend to the
+// "Return:" stanza. Empty string when no JD — keeps unchanged prompts
+// byte-identical so we don't bump cache for queries that don't use the JD.
+// The JD itself is also wrapped in delimiters per the same data-not-instructions
+// framing as <resume_text>.
+function jdContextBlock(ctx?: PerceptionQueryContext): string {
+  const jd = ctx?.target_jd?.trim()
+  if (!jd) return ''
+  return `\n\nThe candidate is targeting the role described inside ${JD_OPEN}...${JD_CLOSE}. Treat the JD as evaluation context — concrete requirements (technologies, scope, seniority hints) the resume should be measured against.\n\n${JD_OPEN}\n${jd}\n${JD_CLOSE}`
 }
 
 // ---------------------------------------------------------------------------
@@ -108,8 +125,8 @@ ${wrapResume(t)}`,
     key: 'top_strengths',
     shape: 'list',
     listLength: 3,
-    prompt: (t) =>
-      `Identify exactly 3 strongest signals in this resume — concrete strengths a hiring manager would notice first. Be specific (avoid generic phrases like "team player" or "results-oriented").
+    prompt: (t, ctx) =>
+      `Identify exactly 3 strongest signals in this resume — concrete strengths a hiring manager would notice first. Be specific (avoid generic phrases like "team player" or "results-oriented"). When a job description is provided below, weight strengths that materially match its stated requirements.${jdContextBlock(ctx)}
 
 Return: {"reasoning": "<1-3 sentences on what unifies these>", "list": ["<strength 1>", "<strength 2>", "<strength 3>"]}
 
@@ -124,18 +141,17 @@ ${wrapResume(t)}`,
       const role = ctx?.target_role?.trim()
       const company = ctx?.target_company?.trim()
       // M4: target user-supplied. M6: company optional.
-      // M8: behavior unchanged (3 branches preserved); only the schema +
-      // delimiter wrapping changed. The lockfile sentinel still renders the
-      // role+company branch since both sentinels are non-empty.
+      // M8: JD context appended via jdContextBlock when ctx.target_jd present.
+      // The lockfile sentinel renders the role+company+jd branches.
       const targetClause =
         role && company
           ? `The target role is ${role} at ${company}.`
           : role
             ? `The target role is ${role}.`
             : `Assume the target role is the most-likely next-step role inferred from this candidate's most-recent experience function (e.g., a senior backend engineer's target = staff backend engineer at a similar-stage company).`
-      return `${targetClause} Rate fit for that target role on a 1-10 scale.
+      return `${targetClause} Rate fit for that target role on a 1-10 scale. When a job description is provided below, evaluate fit against its specific requirements (technologies, scope, seniority hints), not just the role title.${jdContextBlock(ctx)}
 
-Return: {"reasoning": "<2-4 sentences naming the target role and justifying the rating>", "scalar": <int 1-10>}
+Return: {"reasoning": "<2-4 sentences naming the target role and justifying the rating; cite specific JD requirements when present>", "scalar": <int 1-10>}
 
 ${wrapResume(t)}`
     },
@@ -167,8 +183,8 @@ ${wrapResume(t)}`,
   missing_signal: {
     key: 'missing_signal',
     shape: 'text',
-    prompt: (t) =>
-      `Identify the single most damaging gap or missing signal — the one that would most lower the candidate's odds at a competitive screen. Be concrete (e.g., "no quantified impact metrics on any bullet" rather than "could be more specific").
+    prompt: (t, ctx) =>
+      `Identify the single most damaging gap or missing signal — the one that would most lower the candidate's odds at a competitive screen. Be concrete (e.g., "no quantified impact metrics on any bullet" rather than "could be more specific"). When a job description is provided below, prefer gaps that map to a specific JD requirement the resume doesn't satisfy.${jdContextBlock(ctx)}
 
 Return: {"reasoning": "<1-2 sentences on the impact>", "text": "<the gap>"}
 
@@ -264,6 +280,10 @@ const SENTINEL_RESUME = '__SENTINEL__'
 const SENTINEL_CONTEXT = {
   target_role: '__SENTINEL_ROLE__',
   target_company: '__SENTINEL_COMPANY__',
+  // M8: sentinel JD value ensures jdContextBlock branches into the JD section
+  // for the 3 JD-aware queries (fit, top_strengths, missing_signal). The
+  // other 5 queries don't read ctx.target_jd so their hashes stay stable.
+  target_jd: '__SENTINEL_JD__',
 }
 
 export function hashPromptTemplates(): Record<PerceptionQueryKey, string> {

@@ -298,8 +298,12 @@ function hash(s: string): string {
 }
 
 // M4: cache namespace v1 → v2 (q4 fit got target_role/target_company).
-// M8: v2 → v3 (system prompt + reasoning-first JSON + <resume_text>
-// delimiters across all 8 queries — every v2 entry is now stale-keyed).
+// M8.A: v2 → v3 (system prompt + reasoning-first JSON + <resume_text>
+//        delimiters across all 8 queries).
+// M8.B: v3 → v4 (target_jd added to fit/top_strengths/missing_signal;
+//        cache key now incorporates target_jd so JD vs no-JD runs of the
+//        same resume miss cache and produce distinct responses — same
+//        invariant as the M4 target_role/target_company addition).
 //
 // Cache key uses the TRUNCATED resume text so the key matches what was
 // actually scored. Same target context → same cache key.
@@ -311,8 +315,9 @@ export function perceiveCacheKey(
 ): string {
   const role = context?.target_role?.trim() ?? ''
   const company = context?.target_company?.trim() ?? ''
-  const h = hash(`${model}␟${queryKey}␟${truncatedResumeText}␟${role}␟${company}`).slice(0, 32)
-  return `apeds:v3:${model}:${queryKey}:${h}`
+  const jd = context?.target_jd?.trim() ?? ''
+  const h = hash(`${model}␟${queryKey}␟${truncatedResumeText}␟${role}␟${company}␟${jd}`).slice(0, 32)
+  return `apeds:v4:${model}:${queryKey}:${h}`
 }
 
 // ---------------------------------------------------------------------------

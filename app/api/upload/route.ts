@@ -32,9 +32,12 @@ async function handleUpload(request: Request) {
   const file = formData.get('file') as File | null
   const targetRoleRaw = formData.get('target_role')
   const targetCompanyRaw = formData.get('target_company')
+  const targetJdRaw = formData.get('target_jd')
   const targetRole = typeof targetRoleRaw === 'string' ? targetRoleRaw.trim() : ''
   const targetCompany =
     typeof targetCompanyRaw === 'string' ? targetCompanyRaw.trim() : ''
+  const targetJd =
+    typeof targetJdRaw === 'string' ? targetJdRaw.trim() : ''
 
   if (!file) {
     return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -56,6 +59,14 @@ async function handleUpload(request: Request) {
   if (targetCompany.length > 0 && (targetCompany.length < 2 || targetCompany.length > 80)) {
     return NextResponse.json(
       { error: 'target_company must be 2-80 characters when provided' },
+      { status: 400 }
+    )
+  }
+  // M8.B: target_jd is optional. Empty is fine; if present, ≥ 2 chars and
+  // soft-capped at 10K (matches JD_MAX in target-validation.ts).
+  if (targetJd.length > 0 && (targetJd.length < 2 || targetJd.length > 10_000)) {
+    return NextResponse.json(
+      { error: 'target_jd must be 2-10,000 characters when provided' },
       { status: 400 }
     )
   }
@@ -121,6 +132,7 @@ async function handleUpload(request: Request) {
       raw_text: rawText,
       target_role: targetRole,
       target_company: targetCompany,
+      target_jd: targetJd || null,
     })
     .select()
     .single()
@@ -138,6 +150,7 @@ async function handleUpload(request: Request) {
       resume_id: resume.id,
       target_role: targetRole,
       has_target_company: targetCompany.length > 0,
+      has_target_jd: targetJd.length > 0,
       file_size_bytes: file.size,
     },
   })

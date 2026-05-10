@@ -44,7 +44,7 @@ export function UploadFlow() {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState<Step>('idle')
-  const [target, setTarget] = useState<TargetInput>({ target_role: '', target_company: '' })
+  const [target, setTarget] = useState<TargetInput>({ target_role: '', target_company: '', target_jd: '' })
   const [errorMsg, setErrorMsg] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const [currentNode, setCurrentNode] = useState<string | null>(null)
@@ -68,6 +68,7 @@ export function UploadFlow() {
     posthog.capture('resume_upload_started', {
       target_role: target.target_role.trim(),
       has_target_company: target.target_company.trim().length > 0,
+      has_target_jd: target.target_jd.trim().length > 0,
       file_size_bytes: file.size,
     })
 
@@ -77,6 +78,7 @@ export function UploadFlow() {
       uploadForm.append('file', file)
       uploadForm.append('target_role', target.target_role.trim())
       uploadForm.append('target_company', target.target_company.trim())
+      uploadForm.append('target_jd', target.target_jd.trim())
       const uploadRes = await fetch('/api/upload', { method: 'POST', body: uploadForm })
       if (!uploadRes.ok) {
         const { error } = await uploadRes.json()

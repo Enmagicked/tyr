@@ -1,14 +1,14 @@
 {
-  "version": "v3",
-  "comment": "SHA-256 (truncated to 16 hex chars) of each rendered USER prompt template at the SENTINEL_RESUME placeholder + sentinel target context. Run npm test (lib/llm/__tests__/prompts.test.ts) — it asserts the live hashes equal these. M8 bumped v2 → v3: every query restructured for system-prompt + reasoning-first JSON + <resume_text> delimiters. Cache namespace bumped to apeds:v3 in lib/llm/perceive.ts in lockstep. Note: SYSTEM_PROMPT changes are NOT captured here — bump cache manually if SYSTEM_PROMPT itself changes. If a template intentionally changes, regenerate via `node --experimental-strip-types -e \"import('./lib/llm/prompts.ts').then(m => console.log(JSON.stringify(m.hashPromptTemplates(), null, 2)))\"` AND bump the cache version in lib/llm/perceive.ts (apeds:vN → apeds:vN+1) so stale cached completions don't pollute new prompts.",
+  "version": "v4",
+  "comment": "SHA-256 (truncated to 16 hex chars) of each rendered USER prompt template at the SENTINEL_RESUME placeholder + sentinel target context (now including target_jd as of M8.B). Run npm test (lib/llm/__tests__/prompts.test.ts) — it asserts the live hashes equal these. M8.A bumped v2 → v3 (system prompt + reasoning-first JSON + <resume_text> delimiters). M8.B bumped v3 → v4 (target_jd added to fit, top_strengths, missing_signal). Cache namespace bumped to apeds:v4 in lib/llm/perceive.ts in lockstep. Note: SYSTEM_PROMPT changes are NOT captured here — bump cache manually if SYSTEM_PROMPT itself changes. If a template intentionally changes, regenerate via `node --experimental-strip-types -e \"import('./lib/llm/prompts.ts').then(m => console.log(JSON.stringify(m.hashPromptTemplates(), null, 2)))\"` AND bump the cache version in lib/llm/perceive.ts (apeds:vN → apeds:vN+1) so stale cached completions don't pollute new prompts.",
   "hashes": {
     "seniority": "27c81fd5bc785929",
     "technical_depth": "83f89771e1b58ad5",
-    "top_strengths": "68f7117dae951e23",
-    "fit": "81201aa3569083e3",
+    "top_strengths": "3e8d1fe6bbc5cdbe",
+    "fit": "270197e85ffaa4a6",
     "final_round_probability": "bced1dcea5358887",
     "key_credential": "82e3351f61eda743",
-    "missing_signal": "d0fc54aa7668a42e",
+    "missing_signal": "de752f6804aef6c8",
     "ai_authored": "1e66f07ef8115eb0"
   }
 }

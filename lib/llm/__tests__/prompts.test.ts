@@ -81,6 +81,43 @@ test('M8: SYSTEM_PROMPT does NOT leak any sentinel resume content', () => {
   assert.ok(!SYSTEM_PROMPT.includes('${'))
 })
 
+test('M8.B: target_jd context appears in fit / top_strengths / missing_signal prompts when present', () => {
+  const sentinel = '__TEST_RESUME__'
+  const ctxWithJd = {
+    target_role: 'Senior SWE',
+    target_company: 'Stripe',
+    target_jd: 'JD_SENTINEL_TEXT — distributed systems, Kafka, payments scale',
+  }
+  for (const key of ['fit', 'top_strengths', 'missing_signal'] as const) {
+    const rendered = PERCEPTION_QUERIES[key].prompt(sentinel, ctxWithJd)
+    assert.ok(rendered.includes('<job_description>'), `${key}: must wrap JD in delimiter when present`)
+    assert.ok(rendered.includes('</job_description>'))
+    assert.ok(rendered.includes('JD_SENTINEL_TEXT'), `${key}: must inline the JD text`)
+  }
+})
+
+test('M8.B: target_jd context is OMITTED from fit / top_strengths / missing_signal when absent', () => {
+  const sentinel = '__TEST_RESUME__'
+  const ctxNoJd = { target_role: 'Senior SWE', target_company: 'Stripe' }
+  for (const key of ['fit', 'top_strengths', 'missing_signal'] as const) {
+    const rendered = PERCEPTION_QUERIES[key].prompt(sentinel, ctxNoJd)
+    assert.ok(!rendered.includes('<job_description>'), `${key}: must NOT include JD block when target_jd absent`)
+  }
+})
+
+test('M8.B: 5 non-JD-aware queries IGNORE target_jd (sentinel hash unchanged regardless)', () => {
+  const sentinel = '__TEST_RESUME__'
+  const noJd = { target_role: 'X', target_company: 'Y' }
+  const withJd = { target_role: 'X', target_company: 'Y', target_jd: 'irrelevant' }
+  for (const key of ['seniority', 'technical_depth', 'final_round_probability', 'key_credential', 'ai_authored'] as const) {
+    assert.equal(
+      PERCEPTION_QUERIES[key].prompt(sentinel, noJd),
+      PERCEPTION_QUERIES[key].prompt(sentinel, withJd),
+      `${key}: prompt must be identical regardless of target_jd presence`
+    )
+  }
+})
+
 test('M8: getJsonSchema returns reasoning-first schemas with correct shape per query type', () => {
   for (const key of PERCEPTION_QUERY_KEYS) {
     const schema = getJsonSchema(key)

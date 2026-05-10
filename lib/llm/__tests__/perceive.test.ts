@@ -140,9 +140,31 @@ test('perceiveCacheKey: differs across model / query / text', () => {
   assert.notEqual(base, perceiveCacheKey('gpt-4o', 'seniority', 'r2'))
 })
 
-test('perceiveCacheKey: namespaced under apeds:v3 (M8 bumped from v2)', () => {
+test('perceiveCacheKey: namespaced under apeds:v4 (M8.B bumped from v3)', () => {
   const k = perceiveCacheKey('llama-3.3-70b', 'ai_authored', 'x')
-  assert.ok(k.startsWith('apeds:v3:llama-3.3-70b:ai_authored:'))
+  assert.ok(k.startsWith('apeds:v4:llama-3.3-70b:ai_authored:'))
+})
+
+test('M8.B perceiveCacheKey: same resume + different target_jd → different keys', () => {
+  const a = perceiveCacheKey('gpt-4o', 'fit', 'r', {
+    target_role: 'SWE',
+    target_company: 'Google',
+    target_jd: 'Build distributed systems with Kafka',
+  })
+  const b = perceiveCacheKey('gpt-4o', 'fit', 'r', {
+    target_role: 'SWE',
+    target_company: 'Google',
+    target_jd: 'Build React frontends',
+  })
+  assert.notEqual(a, b, 'JD context must affect the cache key')
+})
+
+test('M8.B perceiveCacheKey: omitting JD vs empty JD vs whitespace JD → same key', () => {
+  const omitted = perceiveCacheKey('gpt-4o', 'fit', 'r', { target_role: 'SWE' })
+  const empty = perceiveCacheKey('gpt-4o', 'fit', 'r', { target_role: 'SWE', target_jd: '' })
+  const ws = perceiveCacheKey('gpt-4o', 'fit', 'r', { target_role: 'SWE', target_jd: '   ' })
+  assert.equal(omitted, empty)
+  assert.equal(omitted, ws)
 })
 
 test('perceiveCacheKey: same resume + different target_role → different keys (M4 acceptance #11)', () => {
