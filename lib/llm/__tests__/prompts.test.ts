@@ -11,6 +11,8 @@ import { dirname, join } from 'node:path'
 import {
   PERCEPTION_QUERIES,
   PERCEPTION_QUERY_KEYS,
+  SYSTEM_PROMPT,
+  getJsonSchema,
   hashPromptTemplates,
 } from '../prompts.ts'
 
@@ -48,12 +50,59 @@ test('every query spec has the required fields', () => {
   }
 })
 
-test('every prompt mentions JSON output and includes the resume', () => {
+test('M8: every prompt wraps resume in <resume_text> delimiters and includes a Return: schema marker', () => {
   const sentinel = '__TEST_RESUME_BODY__'
   for (const key of PERCEPTION_QUERY_KEYS) {
     const rendered = PERCEPTION_QUERIES[key].prompt(sentinel)
-    assert.ok(rendered.includes('JSON'), `${key}: prompt must mention JSON`)
+    assert.ok(rendered.includes('<resume_text>'), `${key}: prompt must wrap resume in <resume_text> delimiter`)
+    assert.ok(rendered.includes('</resume_text>'), `${key}: prompt must close the <resume_text> delimiter`)
     assert.ok(rendered.includes(sentinel), `${key}: prompt must inline the resume text`)
+    assert.ok(rendered.includes('Return:'), `${key}: prompt must include the schema "Return:" stanza`)
+    assert.ok(rendered.includes('"reasoning"'), `${key}: prompt must declare the reasoning field`)
+  }
+})
+
+test('M8: SYSTEM_PROMPT establishes recruiter persona + injection-defense framing', () => {
+  assert.ok(SYSTEM_PROMPT.length > 200, 'SYSTEM_PROMPT looks suspiciously short')
+  // Persona priming
+  assert.ok(/recruiter/i.test(SYSTEM_PROMPT), 'SYSTEM_PROMPT should establish recruiter persona')
+  // Injection-defense paragraph (specific phrases, not just keywords —
+  // these are the exact load-bearing instructions the model must see)
+  assert.ok(SYSTEM_PROMPT.includes('<resume_text>'), 'SYSTEM_PROMPT must reference the delimiter')
+  assert.ok(/ignore those instructions/i.test(SYSTEM_PROMPT), 'SYSTEM_PROMPT must explicitly tell the model to ignore in-resume instructions')
+  // Reasoning-first instruction
+  assert.ok(/reasoning.*before/i.test(SYSTEM_PROMPT), 'SYSTEM_PROMPT must instruct reasoning-first emission')
+})
+
+test('M8: SYSTEM_PROMPT does NOT leak any sentinel resume content', () => {
+  // Defensive: catches accidentally template-stringing a resume into the
+  // system prompt during a future refactor.
+  assert.ok(!SYSTEM_PROMPT.includes('__SENTINEL'))
+  assert.ok(!SYSTEM_PROMPT.includes('${'))
+})
+
+test('M8: getJsonSchema returns reasoning-first schemas with correct shape per query type', () => {
+  for (const key of PERCEPTION_QUERY_KEYS) {
+    const schema = getJsonSchema(key)
+    assert.equal(schema.type, 'object', `${key}: schema must be object`)
+    assert.equal(schema.additionalProperties, false, `${key}: must reject extra fields`)
+    // Reasoning is universal
+    assert.ok(schema.properties.reasoning, `${key}: schema must include reasoning property`)
+    assert.ok(schema.required.includes('reasoning'), `${key}: reasoning must be required`)
+
+    const spec = PERCEPTION_QUERIES[key]
+    if (spec.shape === 'scalar') {
+      assert.ok(schema.properties.scalar, `${key}: scalar schema needs scalar property`)
+      assert.ok(schema.required.includes('scalar'))
+    }
+    if (spec.shape === 'list') {
+      assert.ok(schema.properties.list, `${key}: list schema needs list property`)
+      assert.ok(schema.required.includes('list'))
+    }
+    if (spec.shape === 'text') {
+      assert.ok(schema.properties.text, `${key}: text schema needs text property`)
+      assert.ok(schema.required.includes('text'))
+    }
   }
 })
 
@@ -74,7 +123,7 @@ test('lockfile drift check: live hashes match prompts.lock.json', () => {
       live[key],
       lock.hashes[key],
       `Prompt template for "${key}" changed without bumping the cache version. ` +
-        `Update prompts.lock.json AND bump apeds:v1 in lib/llm/cache.ts.`
+        `Update prompts.lock.json AND bump apeds:vN in lib/llm/perceive.ts.`
     )
   }
 })

@@ -8,6 +8,7 @@ import {
   repairAndParseJson,
   validateAndCoerce,
   perceiveCacheKey,
+  truncateResume,
 } from '../perceive.ts'
 import { PERCEPTION_QUERIES } from '../prompts.ts'
 
@@ -139,9 +140,9 @@ test('perceiveCacheKey: differs across model / query / text', () => {
   assert.notEqual(base, perceiveCacheKey('gpt-4o', 'seniority', 'r2'))
 })
 
-test('perceiveCacheKey: namespaced under apeds:v2 (M4 bumped from v1)', () => {
+test('perceiveCacheKey: namespaced under apeds:v3 (M8 bumped from v2)', () => {
   const k = perceiveCacheKey('llama-3.3-70b', 'ai_authored', 'x')
-  assert.ok(k.startsWith('apeds:v2:llama-3.3-70b:ai_authored:'))
+  assert.ok(k.startsWith('apeds:v3:llama-3.3-70b:ai_authored:'))
 })
 
 test('perceiveCacheKey: same resume + different target_role → different keys (M4 acceptance #11)', () => {
@@ -178,4 +179,65 @@ test('perceiveCacheKey: stable under target whitespace (trim)', () => {
     target_company: 'Google',
   })
   assert.equal(a, b)
+})
+
+// ---------------------------------------------------------------------------
+// M8 length cap
+// ---------------------------------------------------------------------------
+
+test('M8 truncateResume: under 20K chars → unchanged', () => {
+  const text = 'a'.repeat(15_000)
+  const r = truncateResume(text)
+  assert.equal(r.truncated, false)
+  assert.equal(r.text, text)
+  assert.equal(r.text.length, 15_000)
+})
+
+test('M8 truncateResume: at the 20K boundary → unchanged', () => {
+  const text = 'a'.repeat(20_000)
+  const r = truncateResume(text)
+  assert.equal(r.truncated, false)
+  assert.equal(r.text.length, 20_000)
+})
+
+test('M8 truncateResume: over 20K → truncated, preserves head + tail with marker', () => {
+  // Use distinguishable head + middle + tail so we can verify the truncation
+  // strategy keeps the right parts.
+  const head = 'HEAD_'.repeat(2_000)        // 10000 chars
+  const middle = 'MID_'.repeat(2_500)       // 10000 chars (will be dropped)
+  const tail = 'TAIL_'.repeat(1_980)        // 9900 chars
+  const original = head + middle + tail     // 29900 chars
+  assert.ok(original.length > 20_000, 'fixture must exceed cap to test truncation')
+
+  const r = truncateResume(original)
+  assert.equal(r.truncated, true)
+  assert.ok(r.text.startsWith('HEAD_HEAD_'), 'head must be preserved at start')
+  assert.ok(r.text.endsWith('TAIL_TAIL_'), 'tail must be preserved at end')
+  assert.ok(r.text.includes('truncated'), 'must include the truncation marker')
+  assert.ok(!r.text.includes('MID_'), 'middle section must be dropped')
+})
+
+test('M8 truncateResume: empty string → unchanged, not truncated', () => {
+  const r = truncateResume('')
+  assert.equal(r.truncated, false)
+  assert.equal(r.text, '')
+})
+
+test('M8 perceiveCacheKey: cache key uses TRUNCATED text — same cap-overflow resume yields same key', () => {
+  // Two long resumes that differ only past the truncation boundary should
+  // produce the same cache key when truncated identically. Construct so the
+  // truncated form is identical: same head + same tail, different middle.
+  const head = 'HEAD_'.repeat(2_000)
+  const tail = 'TAIL_'.repeat(1_980)
+  const a = head + 'A_'.repeat(5_000) + tail
+  const b = head + 'B_'.repeat(5_000) + tail
+  // Truncate first (simulate what perceive() does), then key off truncated:
+  const truncA = truncateResume(a).text
+  const truncB = truncateResume(b).text
+  assert.equal(truncA, truncB, 'precondition: truncated forms identical')
+  assert.equal(
+    perceiveCacheKey('gpt-4o', 'seniority', truncA),
+    perceiveCacheKey('gpt-4o', 'seniority', truncB),
+    'cache key must be stable for identically-truncated resumes'
+  )
 })
