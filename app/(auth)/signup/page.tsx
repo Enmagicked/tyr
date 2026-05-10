@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import posthog from 'posthog-js'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -15,7 +16,7 @@ export default function SignupPage() {
     setLoading(true)
     setError('')
     const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -26,6 +27,10 @@ export default function SignupPage() {
       setError(error.message)
       setLoading(false)
     } else {
+      if (data.user) {
+        posthog.identify(data.user.id, { email: data.user.email })
+        posthog.capture('user_signed_up', { email: data.user.email })
+      }
       setDone(true)
     }
   }

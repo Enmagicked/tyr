@@ -4,6 +4,7 @@ import { execute } from '@/lib/graph'
 import { broker } from '@/lib/event-broker'
 import { buildAnalysisGraph } from '@/lib/agents'
 import { randomUUID } from 'crypto'
+import { getPostHogClient } from '@/lib/posthog-server'
 
 export async function POST(request: Request) {
   try {
@@ -33,6 +34,14 @@ async function handleAnalyze(request: Request) {
 
   const runId = randomUUID()
   const nodes = buildAnalysisGraph()
+
+  const posthog = getPostHogClient()
+  posthog.capture({
+    distinctId: user.id,
+    event: 'analysis_started',
+    properties: { resume_id: body.resumeId, run_id: runId },
+  })
+  await posthog.shutdown()
 
   // Spawn graph as a background task — this returns immediately.
   // broker.track() holds a strong Node.js reference so the task isn't GC'd mid-run.

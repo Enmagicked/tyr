@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useRef } from 'react'
+import posthog from 'posthog-js'
 import { useScroll } from '@/lib/scroll/use-scroll'
 import { useReducedMotion } from '@/lib/scroll/use-reduced-motion'
 import { clamp } from '@/lib/scroll/easings'
@@ -130,12 +131,14 @@ export function Hero() {
           >
             <Link
               href="/upload"
+              onClick={() => posthog.capture('cta_click', { location: 'hero_primary', destination: '/upload' })}
               className="text-sm font-medium px-7 py-3 rounded-full bg-vellum text-ink shadow-[0_4px_28px_rgba(15,24,48,.22)] hover:scale-[1.025] hover:shadow-[0_6px_36px_rgba(15,24,48,.3)] transition-transform duration-200"
             >
               Decode my resume →
             </Link>
             <Link
               href="/sample"
+              onClick={() => posthog.capture('cta_click', { location: 'hero_secondary', destination: '/sample' })}
               className="text-sm font-medium px-7 py-3 rounded-full border border-vellum/30 text-vellum/90 hover:bg-vellum/10 hover:text-vellum transition-colors duration-200"
             >
               View sample

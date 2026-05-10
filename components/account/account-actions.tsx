@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import posthog from 'posthog-js'
 
 interface AccountActionsProps {
   email: string
@@ -18,6 +19,8 @@ export function AccountActions({ email }: AccountActionsProps) {
 
   async function signOut() {
     setSigningOut(true)
+    posthog.capture('user_signed_out')
+    posthog.reset()
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/')
@@ -34,6 +37,8 @@ export function AccountActions({ email }: AccountActionsProps) {
         throw new Error(body.error ?? body.detail ?? `HTTP ${res.status}`)
       }
       // After server-side cleanup, sign out the local session and redirect.
+      posthog.capture('account_deleted')
+      posthog.reset()
       const supabase = createClient()
       await supabase.auth.signOut()
       router.push('/')

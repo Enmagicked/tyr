@@ -13,6 +13,26 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: here,
   },
+  // PostHog reverse proxy — routes /ingest/* to PostHog so events are less
+  // likely to be intercepted by tracking blockers.
+  async rewrites() {
+    return [
+      {
+        source: "/ingest/static/:path*",
+        destination: "https://us-assets.i.posthog.com/static/:path*",
+      },
+      {
+        source: "/ingest/array/:path*",
+        destination: "https://us-assets.i.posthog.com/array/:path*",
+      },
+      {
+        source: "/ingest/:path*",
+        destination: "https://us.i.posthog.com/:path*",
+      },
+    ];
+  },
+  // Required to support PostHog trailing slash API requests
+  skipTrailingSlashRedirect: true,
 };
 
 // Sentry wrapper. Source-map upload requires SENTRY_AUTH_TOKEN — without it,

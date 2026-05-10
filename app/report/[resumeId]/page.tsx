@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { getPostHogClient } from '@/lib/posthog-server'
 import { LandingNav } from '@/components/landing/nav'
 import { HeadlineScores } from '@/components/report/headline-scores'
 import { ParserDisagreementCard } from '@/components/report/parser-disagreement-card'
@@ -72,6 +73,18 @@ export default async function ReportPage({ params }: PageProps) {
     .single()
 
   if (!resume || resume.candidate_id !== user.id) notFound()
+
+  const posthog = getPostHogClient()
+  posthog.capture({
+    distinctId: user.id,
+    event: 'report_viewed',
+    properties: {
+      resume_id: resumeId,
+      target_role: resume.target_role,
+      has_target_company: !!resume.target_company,
+    },
+  })
+  await posthog.shutdown()
 
   const [{ data: parses }, { data: perception }, { data: disagreement }, { data: queryRows }] =
     await Promise.all([

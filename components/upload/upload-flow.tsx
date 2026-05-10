@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import posthog from 'posthog-js'
 import { TargetForm } from './target-form'
 import { isValidTarget, type TargetInput } from './target-validation'
 
@@ -64,6 +65,12 @@ export function UploadFlow() {
       return
     }
 
+    posthog.capture('resume_upload_started', {
+      target_role: target.target_role.trim(),
+      has_target_company: target.target_company.trim().length > 0,
+      file_size_bytes: file.size,
+    })
+
     try {
       setStep('uploading')
       const uploadForm = new FormData()
@@ -93,6 +100,7 @@ export function UploadFlow() {
       function go() {
         if (redirected) return
         redirected = true
+        posthog.capture('analysis_completed', { resume_id: resumeId, run_id: runId })
         setStep('done')
         router.push(`/report/${resumeId}`)
       }
@@ -113,7 +121,13 @@ export function UploadFlow() {
         go()
       }
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Unknown error')
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      posthog.capture('resume_upload_failed', {
+        target_role: target.target_role.trim(),
+        error_message: message,
+      })
+      posthog.captureException(err)
+      setErrorMsg(message)
       setStep('error')
     }
   }

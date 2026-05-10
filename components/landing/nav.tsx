@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import posthog from 'posthog-js'
 import { useScroll } from '@/lib/scroll/use-scroll'
 import { createClient } from '@/lib/supabase/client'
 
@@ -86,6 +87,7 @@ export function LandingNav({ forceScrolledStyle = false }: LandingNavProps) {
         </div>
         <Link
           href={ctaHref}
+          onClick={() => posthog.capture('cta_click', { location: 'nav', destination: ctaHref, authed: !!authed })}
           className={[
             'text-[13px] font-medium px-5 py-2 rounded-full transition-all duration-[450ms]',
             scrolled

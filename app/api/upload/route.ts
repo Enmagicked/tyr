@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { extractTextFromPDF } from '@/lib/extract-text'
+import { getPostHogClient } from '@/lib/posthog-server'
 
 // Single-handler try/catch so any unhandled throw becomes a JSON 500 with the
 // actual error message, instead of Vercel's HTML FUNCTION_INVOCATION_FAILED
@@ -128,6 +129,19 @@ async function handleUpload(request: Request) {
     console.error('[upload] db error:', dbError)
     return NextResponse.json({ error: 'Failed to save resume' }, { status: 500 })
   }
+
+  const posthog = getPostHogClient()
+  posthog.capture({
+    distinctId: user.id,
+    event: 'resume_upload_completed',
+    properties: {
+      resume_id: resume.id,
+      target_role: targetRole,
+      has_target_company: targetCompany.length > 0,
+      file_size_bytes: file.size,
+    },
+  })
+  await posthog.shutdown()
 
   return NextResponse.json({ resumeId: resume.id })
 }

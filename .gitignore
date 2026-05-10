@@ -42,3 +42,4 @@ next-env.d.ts
 
 # claude code local settings (machine-specific permissions, don't commit)
 .claude/
+.env.local
