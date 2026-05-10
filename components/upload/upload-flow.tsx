@@ -9,7 +9,7 @@ import { isValidTarget, type TargetInput } from './target-validation'
 type Step = 'idle' | 'uploading' | 'analyzing' | 'done' | 'error'
 
 const STEP_LABELS: Record<Step, string> = {
-  idle: 'Drop your PDF here, or click to select',
+  idle: 'Ready',
   uploading: 'Uploading…',
   analyzing: 'Analyzing — running parsers and AI models…',
   done: 'Done. Redirecting…',
@@ -25,42 +25,68 @@ interface GraphEvent {
 }
 
 const NODE_LABELS: Record<string, string> = {
-  load_resume: 'Reading PDF',
-  parse_affinda: 'Parser · Affinda',
+  load_resume: 'Reading resume',
   parse_openresume: 'Parser · OpenResume',
   parse_naive: 'Parser · naive',
   perceive_gpt4o: 'GPT-4o',
   perceive_claude: 'Claude',
   perceive_gemini: 'Gemini',
-  perceive_llama: 'Llama 3.1',
+  perceive_llama: 'Llama 3.3',
   parse_resume: 'Aggregating parsers',
   perceive_resume: 'Aggregating LLMs',
   compute_disagreement: 'Parser disagreement',
   compute_perception_disagreement: 'LLM disagreement (σ, ρ)',
+  analyze_bullets: 'Bullet analysis',
+  synthesize_summary: 'Plain-English summary',
   save_results: 'Saving results',
+}
+
+// M8.C: 3 input kinds. Same target plumbing for all; the picker swaps the
+// resume-input UI underneath.
+type InputKind = 'pdf' | 'url' | 'image'
+
+const INPUT_TABS: { key: InputKind; label: string }[] = [
+  { key: 'pdf', label: 'PDF' },
+  { key: 'url', label: 'URL' },
+  { key: 'image', label: 'Image' },
+]
+
+const ACCEPT_BY_KIND: Record<InputKind, string> = {
+  pdf: '.pdf,application/pdf',
+  image: 'image/png,image/jpeg,image/webp',
+  url: '', // unused
 }
 
 export function UploadFlow() {
   const router = useRouter()
-  const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState<Step>('idle')
   const [target, setTarget] = useState<TargetInput>({ target_role: '', target_company: '', target_jd: '' })
+  const [inputKind, setInputKind] = useState<InputKind>('pdf')
+  const [url, setUrl] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const [currentNode, setCurrentNode] = useState<string | null>(null)
 
   const targetReady = isValidTarget(target)
   const isActive = step !== 'idle' && step !== 'error'
+  const urlReady = inputKind === 'url' && url.trim().length > 0
 
-  async function processFile(file: File) {
-    if (file.type !== 'application/pdf') {
-      setErrorMsg('Only PDF files are supported.')
+  // Common submit path. PDF / image branches pass a `file`; URL branch passes
+  // null + relies on the `url` state.
+  async function submit(file: File | null) {
+    if (!isValidTarget(target)) {
+      setErrorMsg('Fill in the target role first.')
       setStep('error')
       return
     }
-
-    if (!isValidTarget(target)) {
-      setErrorMsg('Fill in target role and company first.')
+    if (inputKind !== 'url' && !file) {
+      setErrorMsg('Choose a file first.')
+      setStep('error')
+      return
+    }
+    if (inputKind === 'url' && !urlReady) {
+      setErrorMsg('Enter a URL first.')
       setStep('error')
       return
     }
@@ -69,20 +95,24 @@ export function UploadFlow() {
       target_role: target.target_role.trim(),
       has_target_company: target.target_company.trim().length > 0,
       has_target_jd: target.target_jd.trim().length > 0,
-      file_size_bytes: file.size,
+      input_kind: inputKind,
+      file_size_bytes: file?.size,
     })
 
     try {
       setStep('uploading')
       const uploadForm = new FormData()
-      uploadForm.append('file', file)
+      uploadForm.append('input_kind', inputKind)
       uploadForm.append('target_role', target.target_role.trim())
       uploadForm.append('target_company', target.target_company.trim())
       uploadForm.append('target_jd', target.target_jd.trim())
+      if (file) uploadForm.append('file', file)
+      if (inputKind === 'url') uploadForm.append('url', url.trim())
+
       const uploadRes = await fetch('/api/upload', { method: 'POST', body: uploadForm })
       if (!uploadRes.ok) {
-        const { error } = await uploadRes.json()
-        throw new Error(error ?? 'Upload failed')
+        const { error, hint } = await uploadRes.json()
+        throw new Error(hint ? `${error} — ${hint}` : (error ?? 'Upload failed'))
       }
       const { resumeId } = await uploadRes.json()
 
@@ -126,6 +156,7 @@ export function UploadFlow() {
       const message = err instanceof Error ? err.message : 'Unknown error'
       posthog.capture('resume_upload_failed', {
         target_role: target.target_role.trim(),
+        input_kind: inputKind,
         error_message: message,
       })
       posthog.captureException(err)
@@ -136,89 +167,147 @@ export function UploadFlow() {
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (file) processFile(file)
+    if (file) submit(file)
+    e.target.value = ''
   }
 
   function onDrop(e: React.DragEvent) {
     e.preventDefault()
     setIsDragging(false)
     const file = e.dataTransfer.files?.[0]
-    if (file) processFile(file)
+    if (file) submit(file)
   }
+
+  const dropzoneActive = inputKind !== 'url' && targetReady && !isActive
 
   return (
     <div className="flex flex-col gap-6">
       <TargetForm value={target} onChange={setTarget} disabled={isActive} />
 
-      <div
-        onClick={() => !isActive && targetReady && inputRef.current?.click()}
-        onDragOver={(e) => {
-          if (isActive || !targetReady) return
-          e.preventDefault()
-          setIsDragging(true)
-        }}
-        onDragLeave={() => setIsDragging(false)}
-        onDrop={(e) => {
-          if (isActive || !targetReady) return
-          onDrop(e)
-        }}
-        aria-disabled={isActive || !targetReady}
-        className={[
-          'relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-16 text-center transition-colors',
-          targetReady && !isActive ? 'cursor-pointer' : 'cursor-not-allowed',
-          isDragging
-            ? 'border-ink bg-paper'
-            : targetReady
-            ? 'border-driftwood/40 hover:border-ink/60 bg-paper/40'
-            : 'border-bone bg-paper/20',
-        ].join(' ')}
-      >
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".pdf,application/pdf"
-          className="hidden"
-          onChange={onFileChange}
-        />
-
-        {isActive ? (
-          <div className="flex flex-col items-center gap-3">
-            <Spinner />
-            <p className="text-sm text-ink">{STEP_LABELS[step]}</p>
-            {step === 'analyzing' && currentNode && (
-              <p className="text-xs text-driftwood font-mono">
-                {NODE_LABELS[currentNode] ?? currentNode}
-              </p>
-            )}
-          </div>
-        ) : step === 'error' ? (
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-sm font-medium text-clay">
-              {errorMsg || STEP_LABELS.error}
-            </p>
+      {/* M8.C: input-kind tabs */}
+      <div className="flex items-center gap-1.5" role="tablist" aria-label="Input mode">
+        {INPUT_TABS.map((tab) => {
+          const active = tab.key === inputKind
+          return (
             <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setStep('idle')
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              disabled={isActive}
+              onClick={() => {
+                setInputKind(tab.key)
                 setErrorMsg('')
-                setCurrentNode(null)
+                if (step === 'error') setStep('idle')
               }}
-              className="text-xs text-driftwood underline"
+              className={[
+                'rounded-full px-4 py-1.5 text-xs font-medium transition-colors',
+                active
+                  ? 'bg-ink text-vellum'
+                  : 'bg-paper text-driftwood hover:text-ink border border-bone',
+                isActive ? 'opacity-50 cursor-not-allowed' : '',
+              ].join(' ')}
             >
-              Try again
+              {tab.label}
             </button>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-2">
-            <p className="font-serif text-2xl text-ink">
-              {targetReady ? 'Drop your PDF here' : 'Fill in target above first'}
-            </p>
-            <p className="text-xs text-driftwood/70">
-              PDF only · ≤10MB · Encrypted at rest
-            </p>
-          </div>
-        )}
+          )
+        })}
       </div>
+
+      {isActive ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-driftwood/40 bg-paper/40 p-16 text-center">
+          <Spinner />
+          <p className="text-sm text-ink">{STEP_LABELS[step]}</p>
+          {step === 'analyzing' && currentNode && (
+            <p className="text-xs text-driftwood font-mono">
+              {NODE_LABELS[currentNode] ?? currentNode}
+            </p>
+          )}
+        </div>
+      ) : step === 'error' ? (
+        <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-clay/30 bg-paper/40 p-16 text-center">
+          <p className="text-sm font-medium text-clay">{errorMsg || STEP_LABELS.error}</p>
+          <button
+            onClick={() => {
+              setStep('idle')
+              setErrorMsg('')
+              setCurrentNode(null)
+            }}
+            className="text-xs text-driftwood underline"
+          >
+            Try again
+          </button>
+        </div>
+      ) : inputKind === 'url' ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-bone bg-paper/40 p-6">
+          <label htmlFor="resume-url" className="text-xs text-driftwood">
+            URL of your personal site, GitHub README, or Notion resume page
+          </label>
+          <input
+            id="resume-url"
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://yourname.com/resume"
+            disabled={!targetReady}
+            className="rounded-lg border border-bone bg-vellum/50 px-3 py-2.5 text-sm focus:outline-none focus:border-ink/40 focus:ring-2 focus:ring-thistle/20 disabled:opacity-50"
+          />
+          <button
+            onClick={() => submit(null)}
+            disabled={!targetReady || !urlReady}
+            className="self-start rounded-full bg-ink px-5 py-2 text-sm font-medium text-vellum hover:bg-ink/90 disabled:opacity-40"
+          >
+            Decode URL →
+          </button>
+          <p className="text-[12px] text-driftwood/80 leading-relaxed">
+            We fetch the page server-side, run Mozilla Readability to extract
+            the main text, then feed that to the same parsers and LLMs as a
+            PDF upload. Private IPs and non-http schemes are rejected.
+          </p>
+        </div>
+      ) : (
+        <div
+          onClick={() => dropzoneActive && fileInputRef.current?.click()}
+          onDragOver={(e) => {
+            if (!dropzoneActive) return
+            e.preventDefault()
+            setIsDragging(true)
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(e) => {
+            if (!dropzoneActive) return
+            onDrop(e)
+          }}
+          aria-disabled={!dropzoneActive}
+          className={[
+            'relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-16 text-center transition-colors',
+            dropzoneActive ? 'cursor-pointer' : 'cursor-not-allowed',
+            isDragging
+              ? 'border-ink bg-paper'
+              : dropzoneActive
+              ? 'border-driftwood/40 hover:border-ink/60 bg-paper/40'
+              : 'border-bone bg-paper/20',
+          ].join(' ')}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPT_BY_KIND[inputKind]}
+            className="hidden"
+            onChange={onFileChange}
+          />
+          <p className="font-serif text-2xl text-ink">
+            {!targetReady
+              ? 'Fill in target above first'
+              : inputKind === 'image'
+              ? 'Drop your resume image here'
+              : 'Drop your PDF here'}
+          </p>
+          <p className="text-xs text-driftwood/70">
+            {inputKind === 'image' ? 'PNG / JPEG / WebP · ≤10MB · OCR\'d server-side' : 'PDF only · ≤10MB · Encrypted at rest'}
+          </p>
+        </div>
+      )}
     </div>
   )
 }

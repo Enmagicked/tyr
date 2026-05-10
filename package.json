@@ -10,16 +10,18 @@
     "lint": "eslint",
     "bootstrap": "node --env-file=.env.local scripts/bootstrap-storage.mjs",
     "sample:regen": "node --env-file=.env.local scripts/generate-sample.mjs",
-    "test": "node --test --experimental-strip-types lib/parsers/__tests__/normalize.test.ts lib/parsers/__tests__/employers.test.ts lib/parsers/__tests__/determinism.test.ts lib/parsers/__tests__/bullet-metrics.test.ts lib/agents/__tests__/disagreement.test.ts lib/disagreement/__tests__/pairwise.test.ts lib/llm/__tests__/cache.test.ts lib/llm/__tests__/embed.test.ts lib/llm/__tests__/prompts.test.ts lib/llm/__tests__/perceive.test.ts lib/agents/__tests__/perception-disagreement.test.ts lib/agents/__tests__/ai-legibility.test.ts lib/agents/__tests__/analyze-bullets.test.ts lib/agents/__tests__/synthesize-summary.test.ts components/upload/__tests__/target-validation.test.ts lib/scroll/__tests__/easings.test.ts"
+    "test": "node --test --experimental-strip-types lib/parsers/__tests__/normalize.test.ts lib/parsers/__tests__/employers.test.ts lib/parsers/__tests__/determinism.test.ts lib/parsers/__tests__/bullet-metrics.test.ts lib/agents/__tests__/disagreement.test.ts lib/disagreement/__tests__/pairwise.test.ts lib/llm/__tests__/cache.test.ts lib/llm/__tests__/embed.test.ts lib/llm/__tests__/prompts.test.ts lib/llm/__tests__/perceive.test.ts lib/agents/__tests__/perception-disagreement.test.ts lib/agents/__tests__/ai-legibility.test.ts lib/agents/__tests__/analyze-bullets.test.ts lib/agents/__tests__/synthesize-summary.test.ts lib/ingest/__tests__/url.test.ts components/upload/__tests__/target-validation.test.ts lib/scroll/__tests__/easings.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
     "@google/generative-ai": "^0.24.1",
+    "@mozilla/readability": "^0.6.0",
     "@sentry/nextjs": "^10.52.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.1",
     "@types/pdf-parse": "^1.1.5",
     "@upstash/redis": "^1.37.0",
+    "jsdom": "^29.1.1",
     "next": "16.2.4",
     "openai": "^6.34.0",
     "pdf-parse": "^1.1.1",
@@ -30,6 +32,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/jsdom": "^28.0.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
