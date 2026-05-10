@@ -71,12 +71,19 @@ function LoginForm() {
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
 
-        <p className="text-sm text-driftwood text-center">
-          No account?{' '}
-          <Link href="/signup" className="text-ink underline">
-            Sign up
-          </Link>
-        </p>
+        <div className="flex flex-col gap-2 text-sm text-driftwood text-center">
+          <p>
+            <Link href="/forgot-password" className="text-ink underline">
+              Forgot password?
+            </Link>
+          </p>
+          <p>
+            No account?{' '}
+            <Link href="/signup" className="text-ink underline">
+              Sign up
+            </Link>
+          </p>
+        </div>
       </div>
     </main>
   )

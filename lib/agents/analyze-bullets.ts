@@ -12,7 +12,7 @@
 
 import type { Context } from '@/lib/graph'
 import type { ParseResult, ParserName } from '@/types'
-import { bulletMetrics, type BulletMetrics } from '@/lib/parsers/bullet-metrics'
+import { bulletMetrics, type BulletMetrics } from '../parsers/bullet-metrics.ts'
 
 export interface BulletAnalysisExperience {
   employer: string
@@ -37,14 +37,30 @@ export interface BulletAnalysis {
   source_parser: ParserName | null
 }
 
-function pickSourceParser(results: ParseResult[]): ParseResult | null {
+function totalBulletsIn(result: ParseResult): number {
+  return (result.canonical_data.experience ?? []).reduce(
+    (sum, exp) => sum + (exp.bullet_count ?? 0),
+    0
+  )
+}
+
+// M7 (KNOWN_ISSUES 2.1): rank parsers by parse_score desc, then return the
+// FIRST one with at least one extracted bullet. The previous "highest-score
+// wins" rule misfired when the top-scored parser nailed contact + sections
+// but couldn't split a single bullet (e.g. OpenResume on a layout it didn't
+// recognize). Falling through to the next-highest gives the bullet-quality
+// pipeline real content to analyze instead of "0 of 0 quantified."
+//
+// If every parser returned zero bullets, we still return the highest-scored
+// one so source_parser stays populated and synthesize_summary's no-bullets
+// branch fires with the right attribution.
+export function pickSourceParser(results: ParseResult[]): ParseResult | null {
   if (results.length === 0) return null
-  // Prefer the highest parse_score; ties resolved by parser_name order
-  // (alphabetical — affinda > naive > openresume).
-  return [...results].sort((a, b) => {
+  const ranked = [...results].sort((a, b) => {
     if (b.parse_score !== a.parse_score) return b.parse_score - a.parse_score
     return a.parser_name.localeCompare(b.parser_name)
-  })[0]
+  })
+  return ranked.find((r) => totalBulletsIn(r) > 0) ?? ranked[0]
 }
 
 export async function analyzeBullets(ctx: Context): Promise<BulletAnalysis | null> {

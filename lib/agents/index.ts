@@ -1,6 +1,8 @@
 import { GraphNode } from '@/lib/graph'
 import { loadResume } from './load-resume'
-import { parseAffinda, parseOpenResume, parseNaive, synthesizeParse } from './parsers'
+// parseAffinda intentionally not imported — dropped from the runtime rotation
+// in M7 (see graph definition below for context + re-enable instructions).
+import { parseOpenResume, parseNaive, synthesizeParse } from './parsers'
 import {
   perceiveGPT4o,
   perceiveClaude,
@@ -29,11 +31,19 @@ export function buildAnalysisGraph(): GraphNode[] {
       fn: loadResume,
     },
     // --- ATS parsers (parallel) ---
-    {
-      name: 'parse_affinda',
-      fn: parseAffinda,
-      depends_on: ['load_resume'],
-    },
+    // M7 (KNOWN_ISSUES 2.2): Affinda silently returned parse_score: 0.0 on
+    // every prod resume — `scoreAndIssues` reaches 0 only when ALL fields
+    // (name/email/phone/skills/experience/education) are empty in the
+    // mapped output, which means Affinda's v3 response shape no longer
+    // matches AffindaDocument in lib/parsers/affinda.ts (likely the trial-
+    // tier workspace returns a different document type).
+    //
+    // Dropped from the runtime rotation. The disagreement scorer in
+    // lib/agents/disagreement.ts handles 2 parsers cleanly (M2 acceptance
+    // criterion 5). lib/parsers/affinda.ts stays as a dormant integration —
+    // to re-enable: add console.log(raw) to parseWithAffinda, run one
+    // upload, compare the response keys against AffindaDocument, fix the
+    // mapping, then re-add the node here.
     {
       name: 'parse_openresume',
       fn: parseOpenResume,
@@ -70,7 +80,9 @@ export function buildAnalysisGraph(): GraphNode[] {
       name: 'parse_resume',
       fn: synthesizeParse,
       depends_on: ['load_resume'],
-      optional_deps: ['parse_affinda', 'parse_openresume', 'parse_naive'],
+      // M7: parse_affinda removed — see comment above. Re-add here when the
+      // Affinda response-shape mapping is fixed.
+      optional_deps: ['parse_openresume', 'parse_naive'],
     },
     {
       name: 'perceive_resume',

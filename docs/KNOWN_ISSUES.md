@@ -3,7 +3,7 @@
 Snapshot as of 2026-05-06, post-M5 deploy. Live URL: https://tyr-mauve.vercel.app.
 Triage in tiers — items in tier 1 should land before publicly sharing the URL.
 
-> **2026-05-10 update — M6 closed.** Done: 1.1, 1.3, 1.4, 1.5, 1.6, 1.7, 2.4, 2.5, 2.9, 2.10, 3.5. Deferred: 1.2 (needs domain). See `docs/MILESTONE_6_VERIFICATION.md`. Next: M7 (2.1, 2.2, 2.3).
+> **2026-05-10 update — M6 + M7 closed.** Done: 1.1, 1.3, 1.4, 1.5, 1.6, 1.7, 2.1, 2.2 (resolved by dropping Affinda from rotation), 2.3, 2.4, 2.5, 2.9, 2.10, 3.5. Deferred: 1.2 (needs domain). See `docs/MILESTONE_6_VERIFICATION.md` + `docs/MILESTONE_7_VERIFICATION.md`. Next: M8 (2.6, 2.7, 2.8).
 
 ---
 
