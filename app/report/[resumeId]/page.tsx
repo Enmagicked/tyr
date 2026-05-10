@@ -5,7 +5,10 @@ import { getPostHogClient } from '@/lib/posthog-server'
 import { LandingNav } from '@/components/landing/nav'
 import { HeadlineScores } from '@/components/report/headline-scores'
 import { ParserDisagreementCard } from '@/components/report/parser-disagreement-card'
+import { ParserAgreementBars } from '@/components/report/parser-agreement-bars'
 import { PerceptionGrid } from '@/components/report/perception-grid'
+import { PerceptionRadar } from '@/components/report/perception-radar'
+import { PerQueryBars } from '@/components/report/per-query-bars'
 import { InterModalDelta } from '@/components/report/inter-modal-delta'
 import { ConsensusList, ConsensusText } from '@/components/report/consensus-blocks'
 import { CaveatCard } from '@/components/report/caveat-card'
@@ -178,13 +181,30 @@ export default async function ReportPage({ params }: PageProps) {
           />
         </section>
 
+        {/* M8.D charts: per-query bars + per-LLM radar (full width, 2 cols on md) */}
+        <section className="grid gap-5 md:grid-cols-2 mb-10 animate-fade-up">
+          <PerQueryBars
+            features={featuresMap}
+            nLLMs={features?.n_llms_responding ?? 0}
+          />
+          <PerceptionRadar queryRows={queryRowsArr} />
+        </section>
+
         {/* Two-column reports */}
         <section className="grid gap-5 md:grid-cols-2 mb-10 animate-fade-up">
-          <ParserDisagreementCard
-            fieldDisagreement={disagreement?.field_disagreement ?? null}
-            experienceAlignment={disagreement?.experience_alignment ?? null}
-            parserPairDiffs={disagreement?.parser_pair_diffs ?? []}
-          />
+          <div className="flex flex-col gap-3">
+            <ParserDisagreementCard
+              fieldDisagreement={disagreement?.field_disagreement ?? null}
+              experienceAlignment={disagreement?.experience_alignment ?? null}
+              parserPairDiffs={disagreement?.parser_pair_diffs ?? []}
+            />
+            {/* M8.D: per-field agreement bars sit under the disagreement card
+                so the user can see the chart and the underlying detail in one column. */}
+            <ParserAgreementBars
+              fieldDisagreement={disagreement?.field_disagreement ?? null}
+              nParsers={parses?.length ?? 0}
+            />
+          </div>
           {features ? (
             <PerceptionGrid
               features={featuresMap}
