@@ -89,6 +89,59 @@ function cleanCompany(s: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Section-header guard (M6)
+// ---------------------------------------------------------------------------
+
+// Resume section names parsers occasionally capture as content (e.g. the
+// string "Experience" landing in `exp.title` when a parser misaligns its
+// section detector). Match is exact (after trim+lowercase+strip-trailing-colon)
+// — we never want to clobber a real "Skills"-named role at, say, an HR-tech
+// company. The list intentionally stays short; extend only when we see a real
+// false-negative.
+const SECTION_HEADERS = new Set([
+  'experience',
+  'work experience',
+  'professional experience',
+  'employment history',
+  'education',
+  'skills',
+  'technical skills',
+  'projects',
+  'certifications',
+  'summary',
+  'profile',
+  'objective',
+  'references',
+  'awards',
+  'honors',
+  'publications',
+  'volunteer',
+  'volunteering',
+  'volunteer experience',
+  'interests',
+  'activities',
+  'languages',
+  'contact',
+])
+
+// Returns null when `raw` is exactly a section header (after a light cleanup
+// pass), else returns the original trimmed string. Callers decide how to
+// react — most should treat null as "drop this field/row."
+export function stripSectionHeader(raw: string | undefined | null): string | null {
+  if (!raw) return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  // Tolerate trailing punctuation ("Experience:", "Skills —") and surrounding
+  // markdown-ish noise some parsers emit.
+  const key = trimmed
+    .toLowerCase()
+    .replace(/[#*_~`]+/g, '')
+    .replace(/[:\-—–]+\s*$/g, '')
+    .trim()
+  return SECTION_HEADERS.has(key) ? null : trimmed
+}
+
+// ---------------------------------------------------------------------------
 // URL classification
 // ---------------------------------------------------------------------------
 
@@ -453,7 +506,9 @@ export function normalize(
 
   // Education --------------------------------------------------------------
   for (const edu of raw.education ?? []) {
-    const school = (edu.institution ?? '').trim()
+    // M6 (2.5): drop rows whose school is just a misread section header.
+    // The `if (school)` guard at the bottom of this block then skips the row.
+    const school = stripSectionHeader(edu.institution) ?? ''
     const ent: CanonicalEducation = {
       school_canonical_id: school ? canonicalizeSchool(school) : '',
       school_raw: school,
@@ -482,9 +537,14 @@ export function normalize(
 
   // Experience -------------------------------------------------------------
   for (const exp of raw.experience ?? []) {
-    const employer = (exp.company ?? '').trim()
-    const title = (exp.title ?? '').trim()
-    const bullets = splitBullets(exp.description)
+    // M6 (2.5): blank out employer/title that are just misread section headers,
+    // and filter the same out of bullets. The `if (employer || title)` guard
+    // below then drops fully-empty rows entirely.
+    const employer = stripSectionHeader(exp.company) ?? ''
+    const title = stripSectionHeader(exp.title) ?? ''
+    const bullets = splitBullets(exp.description).filter(
+      (b) => stripSectionHeader(b) !== null
+    )
 
     const startIso = exp.start_date ? normalizeDate(exp.start_date) : null
     const endIso = exp.end_date ? normalizeDate(exp.end_date) : null

@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -14,4 +15,10 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Sentry wrapper. Source-map upload requires SENTRY_AUTH_TOKEN — without it,
+// errors still report fine but stack traces stay minified. Add SENTRY_ORG +
+// SENTRY_PROJECT + SENTRY_AUTH_TOKEN to the env if you want readable traces;
+// the wrapper auto-detects and skips upload if any are missing.
+export default withSentryConfig(nextConfig, {
+  silent: !process.env.CI,
+});

@@ -26,8 +26,12 @@ export function validateTarget(raw: Partial<TargetInput>): TargetValidation {
   if (role.length < MIN) errors.target_role = 'Role must be at least 2 characters'
   else if (role.length > MAX) errors.target_role = `Role must be under ${MAX} characters`
 
-  if (company.length < MIN) errors.target_company = 'Company must be at least 2 characters'
-  else if (company.length > MAX) errors.target_company = `Company must be under ${MAX} characters`
+  // Company is optional. Empty is fine; a partial entry (1 char) is not — that's
+  // almost always a typo. Above MAX is always rejected.
+  if (company.length > 0 && company.length < MIN)
+    errors.target_company = 'Company must be at least 2 characters'
+  else if (company.length > MAX)
+    errors.target_company = `Company must be under ${MAX} characters`
 
   return {
     ok: Object.keys(errors).length === 0,

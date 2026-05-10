@@ -1,12 +1,21 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { runOpenAI } from '@/lib/llm/openai'
 import { runAnthropic } from '@/lib/llm/anthropic'
 import { generatePerceptionReport } from '@/lib/llm/analyze'
 import { PROMPT_KEYS } from '@/lib/llm/prompts'
 import { LLMResponse } from '@/types'
 
-// No auth, no DB — smoke test only. Remove before production.
+// M1-era smoke test endpoint. Calls 12 LLMs (6 prompts × 2 providers) per
+// request — auth-gating is non-negotiable in prod or anonymous users could
+// burn the LLM key. Companion UI lives at /test (also gated via proxy.ts).
 export async function POST(request: Request) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { resumeText } = await request.json() as { resumeText?: string }
 
   if (!resumeText || resumeText.trim().length < 50) {

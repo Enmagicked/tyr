@@ -14,6 +14,8 @@ import {
   normalizeDegree,
   inferLevel,
   canonicalizeSchool,
+  stripSectionHeader,
+  normalize,
 } from '../normalize.ts'
 
 test('classifyUrl: linkedin', () => {
@@ -156,4 +158,84 @@ test('canonicalizeSchool: head schools', () => {
 
 test('canonicalizeSchool: unknown school slugifies', () => {
   assert.equal(canonicalizeSchool('Some Tiny College'), 'some-tiny-college')
+})
+
+// ---------------------------------------------------------------------------
+// M6 (2.5): stripSectionHeader + normalize() integration
+// ---------------------------------------------------------------------------
+
+test('stripSectionHeader: bare headers return null (case + punctuation insensitive)', () => {
+  assert.equal(stripSectionHeader('Experience'), null)
+  assert.equal(stripSectionHeader('  experience  '), null)
+  assert.equal(stripSectionHeader('EXPERIENCE'), null)
+  assert.equal(stripSectionHeader('Experience:'), null)
+  assert.equal(stripSectionHeader('## Skills'), null)
+  assert.equal(stripSectionHeader('Education —'), null)
+  assert.equal(stripSectionHeader('Work Experience'), null)
+})
+
+test('stripSectionHeader: real content passes through trimmed', () => {
+  assert.equal(stripSectionHeader('Software Engineer'), 'Software Engineer')
+  assert.equal(stripSectionHeader('  Google  '), 'Google')
+  // Substring match must NOT trigger — only exact header strings.
+  assert.equal(
+    stripSectionHeader('Experience building distributed systems'),
+    'Experience building distributed systems'
+  )
+})
+
+test('stripSectionHeader: empty / null / whitespace-only → null', () => {
+  assert.equal(stripSectionHeader(''), null)
+  assert.equal(stripSectionHeader(null), null)
+  assert.equal(stripSectionHeader(undefined), null)
+  assert.equal(stripSectionHeader('   '), null)
+})
+
+test('normalize(): drops education row whose school is just a section header', () => {
+  const { canonical } = normalize(
+    {
+      experience: [],
+      education: [
+        { institution: 'Education', degree: 'BS', field: 'CS' },
+        { institution: 'Yale University', degree: 'BS', field: 'CS' },
+      ],
+      skills: [],
+      certifications: [],
+      languages: [],
+    },
+    'naive'
+  )
+  assert.equal(canonical.education.length, 1)
+  assert.equal(canonical.education[0].school_raw, 'Yale University')
+})
+
+test('normalize(): blanks experience employer/title that are section headers; drops bullets that are headers', () => {
+  const { canonical } = normalize(
+    {
+      experience: [
+        {
+          company: 'Experience',
+          title: 'Skills',
+          description: 'Skills\n• Built distributed systems\nProjects\n• Shipped feature X',
+        },
+        {
+          company: 'Google',
+          title: 'Software Engineer',
+          description: '• Real bullet one\n• Real bullet two',
+        },
+      ],
+      education: [],
+      skills: [],
+      certifications: [],
+      languages: [],
+    },
+    'naive'
+  )
+  // First row had only headers in employer+title → both blanked, but bullets
+  // contain real content so the row survives via the (employer || title) gate?
+  // Actually with both blanked the row is dropped entirely.
+  assert.equal(canonical.experience.length, 1)
+  assert.equal(canonical.experience[0].employer_raw, 'Google')
+  assert.equal(canonical.experience[0].bullets.length, 2)
+  assert.ok(canonical.experience[0].bullets.every((b) => !/^(skills|projects)$/i.test(b)))
 })

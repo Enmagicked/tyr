@@ -72,13 +72,18 @@ export const PERCEPTION_QUERIES: Record<PerceptionQueryKey, PerceptionQuerySpec>
     prompt: (t, ctx) => {
       const role = ctx?.target_role?.trim()
       const company = ctx?.target_company?.trim()
-      // M4: target is now a user input (was inferred-from-resume in M3).
-      // When both fields are missing (legacy pre-M4 rows), fall back to the
-      // M3 wording so old uploads keep working.
+      // M4: target is user-supplied (was inferred from resume in M3).
+      // M6: company is optional. Three branches: role+company, role-only,
+      //     and the M3 inferred fallback for legacy pre-M4 rows with neither.
+      // Note: the lockfile sentinel renders the role+company branch (both
+      // sentinels non-empty), so the hash for `fit` is unchanged by adding
+      // the role-only branch — no cache namespace bump required.
       const targetClause =
         role && company
           ? `The target role is ${role} at ${company}.`
-          : `Assume the target role is the most-likely next-step role inferred from this candidate's most-recent experience function (e.g., a senior backend engineer's target = staff backend engineer at a similar-stage company).`
+          : role
+            ? `The target role is ${role}.`
+            : `Assume the target role is the most-likely next-step role inferred from this candidate's most-recent experience function (e.g., a senior backend engineer's target = staff backend engineer at a similar-stage company).`
       return `${COMMON_INSTRUCTIONS}\n\n${targetClause} Rate fit for that target role on a 1-10 scale.\n\nReturn: {"scalar": <int 1-10>, "reasoning": "<2-4 sentences naming the target role and justifying the rating>"}\n\nResume:\n${t}`
     },
   },

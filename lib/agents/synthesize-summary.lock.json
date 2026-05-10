@@ -1,0 +1,7 @@
+{
+  "version": "v2",
+  "comment": "SHA-256 (truncated to 16 hex chars) of buildPrompt() rendered against SUMMARY_SENTINEL_ARGS in synthesize-summary.ts. Run npm test (lib/agents/__tests__/synthesize-summary.test.ts) — it asserts the live hash equals this. M6 introduced the lockfile (started at v2 to match the cache namespace bump from v1). When you intentionally change the prompt, regenerate via the failing test message and bump the cache namespace (apeds_summary:vN → vN+1) in synthesize-summary.ts so stale completions don't get returned.",
+  "hashes": {
+    "buildPrompt": "f50e6d6f66a99f40"
+  }
+}

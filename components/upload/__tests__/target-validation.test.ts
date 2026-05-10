@@ -11,17 +11,30 @@ import {
   COMMON_ROLES,
 } from '../target-validation.ts'
 
-test('validateTarget: empty inputs → not ok, both errors', () => {
+test('validateTarget: empty inputs → not ok, only role error (M6: company optional)', () => {
   const r = validateTarget({})
   assert.equal(r.ok, false)
   assert.ok(r.errors.target_role)
-  assert.ok(r.errors.target_company)
+  assert.equal(r.errors.target_company, undefined)
 })
 
-test('validateTarget: 1-character inputs → too short', () => {
+test('validateTarget: 1-character role → too short; 1-char company also rejected (typo guard)', () => {
   const r = validateTarget({ target_role: 'A', target_company: 'B' })
   assert.equal(r.ok, false)
   assert.match(r.errors.target_role!, /at least 2/)
+  assert.match(r.errors.target_company!, /at least 2/)
+})
+
+test('validateTarget M6: role-only → ok (company is optional)', () => {
+  const r = validateTarget({ target_role: 'Software Engineer', target_company: '' })
+  assert.equal(r.ok, true)
+  assert.equal(r.normalized.target_company, '')
+})
+
+test('validateTarget M6: role-only with whitespace company → ok (trims to empty)', () => {
+  const r = validateTarget({ target_role: 'Software Engineer', target_company: '   ' })
+  assert.equal(r.ok, true)
+  assert.equal(r.normalized.target_company, '')
 })
 
 test('validateTarget: valid inputs → ok, normalized strips whitespace', () => {
@@ -50,7 +63,9 @@ test('validateTarget: empty after trim → too short', () => {
 
 test('isValidTarget: convenience boolean wrapper matches validateTarget.ok', () => {
   assert.equal(isValidTarget({ target_role: 'SWE', target_company: 'Google' }), true)
+  assert.equal(isValidTarget({ target_role: 'SWE', target_company: '' }), true)
   assert.equal(isValidTarget({ target_role: '', target_company: '' }), false)
+  assert.equal(isValidTarget({ target_role: '', target_company: 'Google' }), false)
 })
 
 test('COMMON_ROLES: contains expected candidate-population staples', () => {

@@ -50,9 +50,11 @@ async function handleUpload(request: Request) {
       { status: 400 }
     )
   }
-  if (targetCompany.length < 2 || targetCompany.length > 80) {
+  // target_company is optional. Empty string is fine; if present, must satisfy
+  // the same 2-80 bounds as role.
+  if (targetCompany.length > 0 && (targetCompany.length < 2 || targetCompany.length > 80)) {
     return NextResponse.json(
-      { error: 'target_company must be 2-80 characters' },
+      { error: 'target_company must be 2-80 characters when provided' },
       { status: 400 }
     )
   }
@@ -65,7 +67,7 @@ async function handleUpload(request: Request) {
   // distinguishable in client and logs.
   let rawText: string
   try {
-    rawText = await extractTextFromPDF(buffer)
+    rawText = await extractTextFromPDF(buffer, file.name)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[upload] PDF text extraction failed:', err)
@@ -74,20 +76,24 @@ async function handleUpload(request: Request) {
         error: 'Could not extract text from PDF',
         detail: message,
         hint:
-          'Most likely: scanned/image-only PDF (no embedded text), encrypted, or malformed. ' +
-          'Try a PDF exported directly from a word processor (not scanned).',
+          'The PDF is most likely encrypted or malformed. Try a fresh export ' +
+          'from Google Docs / Word.',
       },
       { status: 422 }
     )
   }
   if (!rawText || rawText.trim().length < 50) {
+    // M6: extractTextFromPDF already attempted OCR fallback. Reaching here
+    // means both pdf-parse AND Affinda OCR returned <50 chars — the file
+    // is genuinely empty or unreadable.
     return NextResponse.json(
       {
         error: 'PDF contained no extractable text',
-        detail: `Extracted only ${rawText?.trim().length ?? 0} characters.`,
+        detail: `Extracted only ${rawText?.trim().length ?? 0} characters after trying OCR.`,
         hint:
-          'Likely a scanned/image-only PDF. tyr does not OCR. Re-export your resume from ' +
-          'Google Docs / Word as a fresh PDF — that bakes the text in.',
+          'The PDF appears to be empty, blank, or contains only images that OCR ' +
+          'could not read. Try re-exporting from Google Docs / Word as a fresh ' +
+          'PDF, or paste your resume text directly.',
       },
       { status: 422 }
     )

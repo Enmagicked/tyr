@@ -52,7 +52,7 @@ export function TargetForm({ value, onChange, disabled }: TargetFormProps) {
         </label>
 
         <label htmlFor={companyId} className="flex flex-col gap-1.5">
-          <span className="text-xs text-driftwood">Company</span>
+          <span className="text-xs text-driftwood">Company <span className="text-driftwood/60">(optional)</span></span>
           <input
             id={companyId}
             type="text"
@@ -60,7 +60,7 @@ export function TargetForm({ value, onChange, disabled }: TargetFormProps) {
             onChange={(e) =>
               onChange({ ...value, target_company: e.target.value })
             }
-            placeholder="Google"
+            placeholder="Google (optional)"
             disabled={disabled}
             className="rounded-lg border border-bone bg-vellum/50 px-3 py-2.5 text-sm focus:outline-none focus:border-ink/40 focus:ring-2 focus:ring-thistle/20 disabled:opacity-50"
           />
@@ -74,7 +74,8 @@ export function TargetForm({ value, onChange, disabled }: TargetFormProps) {
 
       <p className="mt-4 text-[12px] text-driftwood/80 leading-relaxed">
         The fit query asks each LLM how well your resume reads against this
-        specific target. Be honest — &ldquo;dream stretch&rdquo; targets just
+        target. Company is optional — leave it blank for a role-only read.
+        Be honest with the role — &ldquo;dream stretch&rdquo; targets just
         produce harsher feedback.
       </p>
     </div>
