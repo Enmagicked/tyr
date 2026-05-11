@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import posthog from 'posthog-js'
 
@@ -11,6 +12,7 @@ export default function SignupPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
+  const router = useRouter()
 
   async function signup() {
     setLoading(true)
@@ -26,11 +28,20 @@ export default function SignupPage() {
     if (error) {
       setError(error.message)
       setLoading(false)
+      return
+    }
+    if (data.user) {
+      posthog.identify(data.user.id, { email: data.user.email })
+      posthog.capture('user_signed_up', { email: data.user.email })
+    }
+    // When Supabase has email confirmation OFF, signUp returns a session
+    // immediately — the user is already signed in. Skip the "check your
+    // email" screen and route them straight into the app. When confirmation
+    // is ON, data.session is null and we show the check-email message.
+    if (data.session) {
+      router.push('/upload')
+      router.refresh()
     } else {
-      if (data.user) {
-        posthog.identify(data.user.id, { email: data.user.email })
-        posthog.capture('user_signed_up', { email: data.user.email })
-      }
       setDone(true)
     }
   }
