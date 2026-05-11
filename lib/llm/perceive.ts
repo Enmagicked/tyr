@@ -154,6 +154,21 @@ async function callAnthropic(args: DispatchArgs): Promise<{ text: string; latenc
   return { text, latency_ms: Date.now() - start }
 }
 
+// Gemini's responseSchema validator silently rejects (or 400s on) any schema
+// containing `additionalProperties` — the field is unknown to its OpenAPI 3.0
+// subset. OpenAI's strict mode REQUIRES additionalProperties: false; same
+// JsonSchema can't satisfy both. Strip it before passing to Gemini.
+function geminiSafeSchema(schema: JsonSchema): unknown {
+  // Defensive: shallow-clone, drop additionalProperties at top level + any
+  // nested object property. Our schemas are 1-level deep so this is enough.
+  const clean: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(schema)) {
+    if (k === 'additionalProperties') continue
+    clean[k] = v
+  }
+  return clean
+}
+
 async function callGemini(args: DispatchArgs): Promise<{ text: string; latency_ms: number }> {
   const start = Date.now()
   const key = process.env.GOOGLE_AI_API_KEY
@@ -166,11 +181,11 @@ async function callGemini(args: DispatchArgs): Promise<{ text: string; latency_m
       temperature: 0,
       maxOutputTokens: 600,
       responseMimeType: 'application/json',
-      // Gemini accepts JSON Schema via responseSchema. Its TS type is the
-      // ResponseSchema enum-based shape; at runtime the SDK accepts plain
-      // string type values ('string', 'number', etc.). Cast through unknown
-      // so the type checker doesn't insist on the enum form.
-      responseSchema: args.schema as unknown as ResponseSchema,
+      // See geminiSafeSchema above for why we drop additionalProperties.
+      // Cast through unknown — the SDK's ResponseSchema type uses the
+      // SchemaType enum, but accepts plain string types ('string', etc.)
+      // at runtime.
+      responseSchema: geminiSafeSchema(args.schema) as ResponseSchema,
     },
   })
   const r = await model.generateContent(args.user)
@@ -380,6 +395,13 @@ export async function perceive(
 }
 
 // All 8 queries for one model; returns whichever succeeded (fail-soft per query).
+//
+// Failures are LOGGED loudly (console.error → Sentry via instrumentation.ts)
+// with the model + query + error so we can diagnose silent providers. The
+// graph's optional_deps pattern means downstream nodes still run with
+// whatever subset of (model, query) tuples returned — but invisible
+// failures were masking real provider bugs (Gemini schema rejection,
+// Together rate limits, etc.).
 export async function perceiveAllQueries(
   model: ModelName,
   resumeText: string,
@@ -389,6 +411,21 @@ export async function perceiveAllQueries(
   const settled = await Promise.allSettled(
     queryKeys.map((k) => perceive(model, k, resumeText, context))
   )
+  const failures = settled
+    .map((r, i) => ({ r, key: queryKeys[i] }))
+    .filter(({ r }) => r.status === 'rejected') as Array<{
+      r: PromiseRejectedResult
+      key: PerceptionQueryKey
+    }>
+  if (failures.length > 0) {
+    for (const { r, key } of failures) {
+      const err = r.reason
+      const message = err instanceof Error ? err.message : String(err)
+      const stack = err instanceof Error ? err.stack?.split('\n').slice(0, 4).join(' | ') : ''
+      console.error(`[perceive] FAILED ${model}/${key}: ${message}${stack ? ' | stack: ' + stack : ''}`)
+    }
+    console.error(`[perceive] ${model}: ${failures.length}/${queryKeys.length} queries failed (see [perceive] FAILED lines above)`)
+  }
   return settled
     .filter((r): r is PromiseFulfilledResult<PerceiveResult> => r.status === 'fulfilled')
     .map((r) => r.value)
