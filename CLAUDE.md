@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **New session? Read [docs/STATE.md](docs/STATE.md) first.** It's the canonical "where is tyr right now" — what shipped, what's broken with workarounds, what's queued, which migrations are applied to prod, and the recurring gotchas (Postgres numeric → string, jsdom externalization, cache namespace bumps, test-runner strip-only quirks). Updated 2026-05-10 after M8.
+
 @AGENTS.md
 
 ## Commands
