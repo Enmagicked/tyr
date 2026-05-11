@@ -23,6 +23,22 @@ Triage in tiers — items in tier 1 should land before publicly sharing the URL.
 **Fix path:** Wire **Resend** with a verified custom domain (3000 emails/mo free) as custom SMTP in Supabase Auth → SMTP Settings. Re-test the recovery-flow repeat behavior — if empty bodies persist with a real domain, escalate to Supabase support with the template + send IDs. Already documented in DEPLOY.md §6.
 **Effort:** S, ~1 hour for Resend wiring; +30 min to verify repeat-recovery behavior.
 
+### 1.8 New-user onboarding flow is buggy end-to-end *(observed 2026-05-10 after usetyr.com domain cutover)*
+**Symptom:** Multiple sequential failures hitting any new user trying to sign up + verify on the live site:
+- Confirmation emails sometimes arrive instantly, sometimes don't arrive at all (no clear pattern, possibly Resend/Supabase rate limiting layered on top of each other).
+- When the email DOES arrive, clicking the confirmation link often returns `{"code":403,"error_code":"otp_expired","msg":"Email link is invalid or has expired"}` even on a fresh-from-inbox click. Caused by Supabase Auth Site URL / Redirect URL configuration drift after domain cutover; even after updating Site URL → `https://usetyr.com` and adding `https://usetyr.com/**` to Redirect URLs, some links still bounce.
+- Repeat password-recovery requests still produce empty-body emails (the M8 follow-up bug from 1.2 — possibly fixed by the domain switch but unverified).
+- `/forgot-password` still inherits Supabase's silent 60s cooldown per address; UX surfaces it now (M8 follow-up commit `191ebe8`) but doesn't help if the underlying SMTP path is also flaky.
+**Why it matters:** Onboarding is the funnel. If new users can't sign up + reach `/upload` reliably, soft launch produces zero conversions even when the rest of the product works.
+**Fix path:**
+1. Smoke-test the full onboarding cycle against `usetyr.com` from 3+ throwaway emails — record which steps succeed/fail and timestamps so the failure mode is reproducible.
+2. Verify Supabase **URL Configuration** is fully cut over: Site URL = `https://usetyr.com`, Redirect URLs include `https://usetyr.com/**` AND `https://usetyr.com/auth/callback` AND any preview/Vercel URLs you still want supported.
+3. Verify Resend domain `usetyr.com` shows green **Verified** in Resend dashboard (DKIM + SPF DNS records actually propagated).
+4. Verify Supabase SMTP Settings Sender = `noreply@usetyr.com` (NOT `usetyr@resend.dev`).
+5. If `otp_expired` persists with everything correct: bump Supabase Auth → Email → Recovery email link expiry from default 1hr to 24hr (Authentication → Email Templates → Settings) so timing isn't the issue, then re-test.
+6. If the link STILL fails on a fresh inbox click: open the link URL, inspect the `?code=` query param + the redirect target, compare against Supabase's expected callback URL. May need to file a Supabase support ticket with the failing link + Site URL config screenshot.
+**Effort:** M, ~2-4 hours of methodical reproduction + config verification + maybe support ticket.
+
 ### 1.3 Delete-my-data not tested on prod
 **Symptom:** The `/account` UI ships with a "Delete all my data" flow that does cascading cleanup of storage + DB + auth.users. The code is right by inspection but has never been exercised end-to-end on prod.
 **Why it matters:** If the cascade is wrong, the user thinks their data is gone but it isn't — and we can't tell without a real run.
