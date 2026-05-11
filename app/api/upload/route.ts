@@ -3,8 +3,12 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { extractTextFromPDF } from '@/lib/extract-text'
 import { ocrDocument } from '@/lib/ocr'
-import { ingestUrl, UrlIngestError } from '@/lib/ingest/url'
 import { getPostHogClient } from '@/lib/posthog-server'
+
+// Note: ingestUrl + UrlIngestError are LAZY-loaded inside ingestFromUrl()
+// below. jsdom + Mozilla Readability are heavy (10+ MB) and can fail at
+// module init time on Vercel cold starts; importing them only when the
+// 'url' branch fires keeps PDF/image uploads independent of that risk.
 
 // M8.C: three input kinds converge on the same resume row.
 //   pdf   — original flow: PDF upload, pdf-parse → OCR fallback.
@@ -109,10 +113,13 @@ async function handleUpload(request: Request) {
         { status: err.statusCode }
       )
     }
-    if (err instanceof UrlIngestError) {
+    // UrlIngestError is structurally checked (not by `instanceof`) since
+    // it's loaded lazily and the import is dynamic. Fields: message + statusCode.
+    if (err && typeof err === 'object' && 'name' in err && (err as { name: string }).name === 'UrlIngestError') {
+      const e = err as unknown as { message: string; statusCode?: number }
       return NextResponse.json(
-        { error: err.message },
-        { status: err.statusCode }
+        { error: e.message },
+        { status: e.statusCode ?? 400 }
       )
     }
     throw err
@@ -274,6 +281,9 @@ async function ingestFromUrl(formData: FormData): Promise<IngestResult> {
   if (typeof urlRaw !== 'string' || urlRaw.trim().length === 0) {
     throw new IngestError({ message: 'No url provided' })
   }
+  // Lazy-import jsdom + Readability so PDF/image uploads don't pay the
+  // module-load cost (or risk the cold-start failure).
+  const { ingestUrl } = await import('@/lib/ingest/url')
   const { text, source_url, title } = await ingestUrl(urlRaw.trim())
   // Synthesize a .txt file so file_path stays meaningful; lets future
   // re-analysis pass re-extract from the cached page text without re-fetching.
