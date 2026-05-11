@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import posthog from 'posthog-js'
 import { createClient } from '@/lib/supabase/client'
@@ -14,13 +14,32 @@ import { createClient } from '@/lib/supabase/client'
 //   /forgot-password  → submit email → resetPasswordForEmail()
 //   email link        → /auth/callback?code=...&next=/account/update-password
 //   /account/update-password → user sets new password → /account
+//
+// M8 follow-up: Supabase enforces a built-in 60s rate limit per email
+// address on auth emails. Hammering the resend button silently 200s without
+// sending — looks like the form is broken. Surface the cooldown explicitly
+// so the user understands they need to wait.
+
+const RESEND_COOLDOWN_SECONDS = 60
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
+  const [cooldownRemaining, setCooldownRemaining] = useState(0)
+
+  // Tick down the cooldown once per second whenever it's > 0.
+  useEffect(() => {
+    if (cooldownRemaining <= 0) return
+    const t = setInterval(() => {
+      setCooldownRemaining((s) => Math.max(0, s - 1))
+    }, 1000)
+    return () => clearInterval(t)
+  }, [cooldownRemaining])
 
   async function send() {
+    if (cooldownRemaining > 0) return
     setLoading(true)
     setError('')
     const supabase = createClient()
@@ -34,6 +53,7 @@ export default function ForgotPasswordPage() {
       posthog.capture('password_reset_requested', { email })
       setSent(true)
       setLoading(false)
+      setCooldownRemaining(RESEND_COOLDOWN_SECONDS)
     }
   }
 
@@ -48,14 +68,35 @@ export default function ForgotPasswordPage() {
         </div>
 
         {sent ? (
-          <div className="rounded-2xl border border-bone bg-paper p-6 text-center">
-            <p className="text-sm text-ink">
-              Check <span className="font-medium">{email}</span> for a reset link.
-            </p>
-            <p className="text-xs text-driftwood mt-2">
-              The link expires in 1 hour. If it doesn&apos;t arrive in a few
-              minutes, check spam or request a new one.
-            </p>
+          <div className="flex flex-col gap-3">
+            <div className="rounded-2xl border border-bone bg-paper p-6 text-center">
+              <p className="text-sm text-ink">
+                Check <span className="font-medium">{email}</span> for a reset link.
+              </p>
+              <p className="text-xs text-driftwood mt-2">
+                The link expires in 1 hour. Don&apos;t see it? Check spam first.
+              </p>
+            </div>
+
+            <button
+              onClick={send}
+              disabled={loading || cooldownRemaining > 0}
+              className="rounded-full bg-ink py-2.5 text-sm font-medium text-vellum hover:bg-ink/90 disabled:opacity-40 transition-colors"
+            >
+              {loading
+                ? 'Sending…'
+                : cooldownRemaining > 0
+                  ? `Resend in ${cooldownRemaining}s`
+                  : 'Resend reset link'}
+            </button>
+
+            {cooldownRemaining > 0 && (
+              <p className="text-[11px] text-driftwood/80 text-center leading-relaxed">
+                The mail server limits one reset email per address per minute.
+                Requests during the cooldown silently no-op — that&apos;s why
+                you saw no second email.
+              </p>
+            )}
           </div>
         ) : (
           <>
