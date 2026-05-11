@@ -11,7 +11,6 @@ import { PerceptionRadar } from '@/components/report/perception-radar'
 import { PerQueryBars } from '@/components/report/per-query-bars'
 import { InterModalDelta } from '@/components/report/inter-modal-delta'
 import { ConsensusList, ConsensusText } from '@/components/report/consensus-blocks'
-import { CaveatCard } from '@/components/report/caveat-card'
 import { PlainSummarySection } from '@/components/report/plain-summary'
 import type { ApedsRawFeatures } from '@/lib/agents/perception-disagreement'
 import type { PlainSummary } from '@/lib/agents/synthesize-summary'
@@ -248,9 +247,6 @@ export default async function ReportPage({ params }: PageProps) {
         <section className="mb-10 animate-fade-up">
           <PlainSummarySection summary={perception?.plain_summary ?? null} />
         </section>
-
-        {/* Caveat */}
-        <CaveatCard />
       </div>
     </main>
   )

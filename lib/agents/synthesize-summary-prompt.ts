@@ -110,6 +110,7 @@ export function buildPrompt(args: BuildPromptArgs): string {
    - "results-driven", "results-oriented", "strong action verbs", "team player", "self-starter", "synergy", "leverage" (resume-coaching clichés the candidate has already heard a thousand times)
    - "critical structural failure", "structural integrity", "disagreement variance" (jargon-as-decoration; explain the underlying signal in plain words instead)
    - "embedding", "cosine", "σ", "ρ", "δ", "APEDS" (the reader does not know what these mean)
+   - "X of N AI judges", "X of N readers", "partial picture", "directional, not definitive", "treat them as", "limited sample", "with that said the", "caveat that" (meta-commentary on how many sources contributed; the reader doesn't care about your tooling's response rates — give them the analysis directly)
 
 3. **Inline-gloss any technical idea** the moment you mention it. Example: write "the three resume-reading systems disagreed on your job titles" — never "high parser disagreement."
 
@@ -122,14 +123,12 @@ export function buildPrompt(args: BuildPromptArgs): string {
 Resume target: ${target}
 File: ${fileName}
 
-Parser data (3 ATS-style resume readers ran in parallel):
-- ${features.n_parsers_responding} of 3 readers succeeded
+Parser data (ATS-style resume readers ran in parallel):
 - ATS legibility (how completely they filled in contact + sections): ${pct(features.ats_legibility)}
 - ATS fragility (how much the readers disagreed about the fill rate): ${fmt(features.ats_fragility)}
 - Overall reader disagreement on the same fields: ${features.overall_parse_disagreement === null ? '—' : fmt(features.overall_parse_disagreement)}
 
-LLM data (4 frontier AI judges were asked the same 8 questions):
-- ${features.n_llms_responding} of 4 judges responded
+LLM data (frontier AI judges were asked the same 8 questions):
 - Mean seniority: ${fmt(features.mean_seniority, 1)}/10 (spread across judges: ${fmt(features.sigma_seniority)})
 - Mean technical depth: ${fmt(features.mean_technical_depth, 1)}/10 (spread: ${fmt(features.sigma_technical_depth)})
 - Mean fit for ${target}: ${fmt(features.mean_fit, 1)}/10 (spread: ${fmt(features.sigma_fit)})

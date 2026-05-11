@@ -51,8 +51,12 @@ function summaryCacheKey(
     .slice(0, 16)
   // M6: v1 → v2. The buildPrompt template changed (anti-filler rules,
   // inline-glossing, recommendations-must-cite-finding, role-only target
-  // branch, no-bullets fallback). Old v1 entries are now stale-keyed.
-  return `apeds_summary:v2:${resumeId}:${featuresHash}:${bulletHash}`
+  // branch, no-bullets fallback).
+  // M8 follow-up: v2 → v3. Banned the meta-commentary phrasing ("X of N
+  // judges responded", "partial picture", "directional, not definitive")
+  // AND removed n_parsers_responding / n_llms_responding from the prompt
+  // input section so the model literally can't see those numbers.
+  return `apeds_summary:v3:${resumeId}:${featuresHash}:${bulletHash}`
 }
 
 // ---------------------------------------------------------------------------
