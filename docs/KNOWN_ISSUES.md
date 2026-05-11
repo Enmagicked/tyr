@@ -15,11 +15,13 @@ Triage in tiers — items in tier 1 should land before publicly sharing the URL.
 **Fix path:** Either (a) add Tesseract.js as a fallback when `pdf-parse` returns < 50 chars, or (b) re-use Affinda's text-extraction API (we already have the key) — Affinda OCRs natively. Option (b) is faster to ship and higher quality.
 **Effort:** M, ~half-day.
 
-### 1.2 Email rate limit will throttle 3rd+ signup
-**Symptom:** Supabase free-tier SMTP sends only ~2 confirmation emails / hour. User #3 today gets "email rate limit exceeded."
-**Why it matters:** Defeats the funnel for any organic batch of signups.
-**Fix path:** Wire **Resend** (3000 emails/mo free) as custom SMTP in Supabase Auth settings. Already documented in DEPLOY.md §6.
-**Effort:** S, ~1 hour.
+### 1.2 Email rate limit + repeat-recovery bug
+**Symptom (a):** Supabase free-tier SMTP sends only ~2 confirmation emails / hour. User #3 today gets "email rate limit exceeded." Defeats the funnel for any organic batch of signups.
+**Symptom (b)** *(observed 2026-05-10):* with Resend's `onboarding@resend.dev` shared sender, the **first** password-recovery email arrives with a working link, but **every subsequent** recovery email to the same address arrives with an empty body — no link, no text. New requests outside the 60s cooldown still fire (Resend sends them, Gmail receives them, threads them) but their body content is blank. Likely a Supabase template-rendering edge case specific to the shared sender; needs a verified domain to confirm/repro.
+**Why it matters:** A locked-out user can only ever use the FIRST recovery link they request. If they wait too long and it expires, they're stuck — every retry produces a blank email.
+**Workaround for now:** Set the password directly from Supabase dashboard → Authentication → Users → Edit user. Fine for the dev; not fine for real users.
+**Fix path:** Wire **Resend** with a verified custom domain (3000 emails/mo free) as custom SMTP in Supabase Auth → SMTP Settings. Re-test the recovery-flow repeat behavior — if empty bodies persist with a real domain, escalate to Supabase support with the template + send IDs. Already documented in DEPLOY.md §6.
+**Effort:** S, ~1 hour for Resend wiring; +30 min to verify repeat-recovery behavior.
 
 ### 1.3 Delete-my-data not tested on prod
 **Symptom:** The `/account` UI ships with a "Delete all my data" flow that does cascading cleanup of storage + DB + auth.users. The code is right by inspection but has never been exercised end-to-end on prod.
