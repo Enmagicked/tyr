@@ -80,12 +80,27 @@ interface ModelPolygon {
   values: (number | null)[]
 }
 
+// Postgres `numeric` columns come back from Supabase's PostgREST as STRINGS
+// to preserve arbitrary precision (perception_query_responses.scalar is
+// numeric, see migration 0003). Coerce to number here — without this every
+// row was dropped by the previous `typeof !== 'number'` guard and the
+// radar rendered the empty state even with full data.
+function toFiniteNumber(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  if (typeof v === 'string') {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
+  }
+  return null
+}
+
 function buildPolygons(rows: PerceptionQueryRow[]): ModelPolygon[] {
   const byModel = new Map<string, Map<string, number>>()
   for (const r of rows) {
-    if (typeof r.scalar !== 'number') continue
+    const n = toFiniteNumber(r.scalar)
+    if (n === null) continue
     if (!byModel.has(r.model_name)) byModel.set(r.model_name, new Map())
-    byModel.get(r.model_name)!.set(r.query_key, r.scalar)
+    byModel.get(r.model_name)!.set(r.query_key, n)
   }
   const out: ModelPolygon[] = []
   for (const [model, scores] of byModel.entries()) {
