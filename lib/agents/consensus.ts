@@ -48,15 +48,39 @@ export function consensusList(
     .map(([k]) => firstOccurrence.get(k) ?? k)
 }
 
-// Text queries: longest text answer wins. Coarse but deterministic.
-// Returns null when 0 rows answered.
+// Text queries: pick the LLM whose answer carries the most useful content,
+// considering BOTH text_value and reasoning. Pre-2026-05-10 this only
+// looked at text_value, so a short headline (e.g. "No iOS experience.")
+// would beat a model whose text_value was even shorter but whose reasoning
+// was a 4-sentence JD-grounded explanation. The reasoning field is where
+// the meat usually lives — we want it surfaced.
+//
+// Strategy:
+//   1. Score each candidate as `text.length + reasoning.length`. Pick the row
+//      with the highest total. Coarse but deterministic.
+//   2. When the winning row has substantive content in BOTH fields (reasoning
+//      > 50% of text length), concatenate "<text> <reasoning>" so the
+//      headline + the supporting detail both reach the reader.
+//   3. Otherwise return whichever of text / reasoning is non-empty.
 export function consensusText(
   rows: readonly PerceptionQueryRow[],
   queryKey: string
 ): string | null {
-  const texts = rows
-    .filter((r) => r.query_key === queryKey && r.text_value)
-    .map((r) => r.text_value!)
-  if (texts.length === 0) return null
-  return texts.reduce((a, b) => (a.length >= b.length ? a : b))
+  const candidates = rows
+    .filter((r) => r.query_key === queryKey)
+    .map((r) => ({
+      text: (r.text_value ?? '').trim(),
+      reasoning: (r.reasoning ?? '').trim(),
+    }))
+    .filter((c) => c.text.length > 0 || c.reasoning.length > 0)
+  if (candidates.length === 0) return null
+
+  const best = candidates.reduce((a, b) =>
+    a.text.length + a.reasoning.length >= b.text.length + b.reasoning.length ? a : b
+  )
+
+  if (best.text && best.reasoning && best.reasoning.length > best.text.length * 0.5) {
+    return `${best.text} ${best.reasoning}`
+  }
+  return best.text || best.reasoning
 }
