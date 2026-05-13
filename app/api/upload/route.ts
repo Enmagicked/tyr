@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { extractTextFromPDF } from '@/lib/extract-text'
 import { ocrDocument } from '@/lib/ocr'
 import { getPostHogClient } from '@/lib/posthog-server'
+import { isAdminEmail } from '@/lib/admin'
 
 // Note: ingestUrl + UrlIngestError are LAZY-loaded inside ingestFromUrl()
 // below. jsdom + Mozilla Readability are heavy (10+ MB) and can fail at
@@ -66,7 +67,9 @@ async function handleUpload(request: Request) {
     .eq('id', user.id)
     .single()
 
-  if (!candidate || (candidate.credits_remaining as number) <= 0) {
+  const isAdmin = isAdminEmail(user.email)
+
+  if (!isAdmin && (!candidate || (candidate.credits_remaining as number) <= 0)) {
     const posthog = getPostHogClient()
     posthog.capture({ distinctId: user.id, event: 'quota_exhausted' })
     await posthog.shutdown()
@@ -171,7 +174,7 @@ async function handleUpload(request: Request) {
     return NextResponse.json({ error: 'Failed to store file' }, { status: 500 })
   }
 
-  const isPriority = (candidate.credits_remaining as number) > 0
+  const isPriority = isAdmin || (candidate ? (candidate.credits_remaining as number) > 0 : false)
   const { data: resume, error: dbError } = await service
     .from('resumes')
     .insert({
@@ -194,14 +197,16 @@ async function handleUpload(request: Request) {
     return NextResponse.json({ error: 'Failed to save resume' }, { status: 500 })
   }
 
-  // Decrement the credit that was checked above
-  await service
-    .from('candidates')
-    .update({
-      credits_remaining: (candidate.credits_remaining as number) - 1,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', user.id)
+  // Decrement the credit that was checked above (admins bypass).
+  if (!isAdmin && candidate) {
+    await service
+      .from('candidates')
+      .update({
+        credits_remaining: (candidate.credits_remaining as number) - 1,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user.id)
+  }
 
   const posthog = getPostHogClient()
   posthog.capture({

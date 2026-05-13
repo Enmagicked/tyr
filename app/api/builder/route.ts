@@ -13,6 +13,7 @@ import { getPostHogClient } from '@/lib/posthog-server'
 import { generateResume } from '@/lib/builder/generate'
 import { renderResumeText } from '@/lib/builder/render'
 import type { BuilderInput } from '@/lib/builder/types'
+import { isAdminEmail } from '@/lib/admin'
 
 export async function POST(request: Request) {
   try {
@@ -43,28 +44,32 @@ async function handleBuilder(request: Request) {
   const service = createServiceClient()
 
   // Credit gate: builder requires both credits_remaining AND a prior purchase.
-  // The free signup credit is analyzer-only.
+  // The free signup credit is analyzer-only. Admin emails skip both checks.
   const { data: candidate } = await service
     .from('candidates')
     .select('credits_remaining, credits_purchased')
     .eq('id', user.id)
     .single()
 
-  if (!candidate || (candidate.credits_remaining as number) <= 0) {
-    return NextResponse.json(
-      { error: 'No credits remaining', code: 'QUOTA_EXCEEDED' },
-      { status: 402 }
-    )
-  }
-  if ((candidate.credits_purchased as number) <= 0) {
-    return NextResponse.json(
-      {
-        error: 'The builder requires purchased credits',
-        code: 'BUILDER_LOCKED',
-        hint: 'Your signup free credit is for the analyzer only. Purchase a credit pack to unlock the builder.',
-      },
-      { status: 402 }
-    )
+  const isAdmin = isAdminEmail(user.email)
+
+  if (!isAdmin) {
+    if (!candidate || (candidate.credits_remaining as number) <= 0) {
+      return NextResponse.json(
+        { error: 'No credits remaining', code: 'QUOTA_EXCEEDED' },
+        { status: 402 }
+      )
+    }
+    if ((candidate.credits_purchased as number) <= 0) {
+      return NextResponse.json(
+        {
+          error: 'The builder requires purchased credits',
+          code: 'BUILDER_LOCKED',
+          hint: 'Your signup free credit is for the analyzer only. Purchase a credit pack to unlock the builder.',
+        },
+        { status: 402 }
+      )
+    }
   }
 
   let body: BuilderRequestBody
@@ -150,13 +155,15 @@ async function handleBuilder(request: Request) {
     return NextResponse.json({ error: 'Failed to save generated resume' }, { status: 500 })
   }
 
-  await service
-    .from('candidates')
-    .update({
-      credits_remaining: (candidate.credits_remaining as number) - 1,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', user.id)
+  if (!isAdmin && candidate) {
+    await service
+      .from('candidates')
+      .update({
+        credits_remaining: (candidate.credits_remaining as number) - 1,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user.id)
+  }
 
   const posthog = getPostHogClient()
   posthog.capture({

@@ -9,6 +9,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { rewriteBullet } from '@/lib/builder/rewrite'
 import { renderResumeText } from '@/lib/builder/render'
 import type { GeneratedResume } from '@/lib/builder/types'
+import { isAdminEmail } from '@/lib/admin'
 
 const REWRITE_CAP = 5
 
@@ -61,7 +62,8 @@ async function handleRewrite(request: Request) {
   if (resume.input_kind !== 'builder') {
     return NextResponse.json({ error: 'Not a builder draft' }, { status: 400 })
   }
-  if ((resume.builder_rewrites_used as number) >= REWRITE_CAP) {
+  const isAdmin = isAdminEmail(user.email)
+  if (!isAdmin && (resume.builder_rewrites_used as number) >= REWRITE_CAP) {
     return NextResponse.json(
       {
         error: `Rewrite limit reached (${REWRITE_CAP} per draft)`,
