@@ -1,48 +1,74 @@
 # tyr — current state
 
-> **Read this first** if you're a new Claude session. Updated 2026-05-13 after M9 code-complete.
+> **Read this first** if you're a new Claude session. Updated 2026-05-13 after M9 shipped to prod.
 
 ---
 
-## ⚡ RESUME HERE (session handoff 2026-05-13)
+## ⚡ RESUME HERE (session handoff 2026-05-13, post-M9)
 
-**M9 code is done. Changes are on disk but NOT yet committed.**
+**M9 is LIVE on prod.** Paywall works end-to-end: free 1 credit on signup → 402 modal on exhaustion → Stripe Checkout → webhook adds credits → next upload succeeds. Smoke-tested with a real $6 charge.
 
-### Uncommitted files (all M9 work — commit before pushing)
-```
-app/auth/callback/route.ts          — OTP expired error handling
-app/(auth)/login/page.tsx           — OTP-expired banner UI
-app/account/page.tsx                — credits card added
-app/api/stripe/checkout/route.ts    — NEW: Stripe checkout session creator
-app/api/stripe/webhook/route.ts     — NEW: webhook handler (checkout.session.completed)
-app/api/upload/route.ts             — 402 quota gate + credit decrement + is_priority
-app/reports/page.tsx                — history gating (free: 3 reports)
-app/upload/page.tsx                 — CreditsAddedBanner import
-components/account/account-actions.tsx  — AccountBuyCredits component added
-components/upload/credits-added-banner.tsx  — NEW: post-checkout success banner
-components/upload/upload-flow.tsx   — paywalled step + paywall modal + buyCredits()
-docs/DEPLOY.md                      — Stripe setup checklist added to §0
-docs/STATE.md                       — this file
-infra/supabase/migrations/0009_credits.sql  — NEW: credits_remaining, credits_purchased, stripe_customer_id, is_priority
-lib/stripe.ts                       — NEW: Stripe singleton + CREDIT_PACKS definition
-```
+### Final M9 commits
+- `d47c0f9` — feat(m9): paywall + onboarding fix (main body)
+- `e62ecb1` — fix(m9): bump 1-credit pack price $4 → $6 to match live Stripe
+- `cdc0f7d` — fix(stripe): explicit payment_method_types=['card'] (Stripe Checkout rejected sessions without it on a fresh-activated account)
 
-### What the user still needs to do before M9 goes live
-1. `git add -A && git commit` — commit the M9 code
-2. **Supabase dashboard**: Site URL = `https://usetyr.com`, Redirect URLs include `https://usetyr.com/**` and `https://usetyr.com/auth/callback`
-3. **Resend dashboard**: confirm `usetyr.com` shows Verified (green DKIM+SPF); SMTP sender = `noreply@usetyr.com` in Supabase Auth → SMTP Settings
-4. **Re-enable email confirmations** in Supabase Auth Settings once steps 2–3 verified
-5. **Stripe Dashboard**: Products → create "Tyr Report" → two one-time prices ($4 / $15) → note Price IDs
-6. **Stripe Dashboard**: Webhooks → add endpoint `https://usetyr.com/api/stripe/webhook` → event `checkout.session.completed` → note signing secret
-7. **Vercel env vars**: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_1_CREDIT`, `STRIPE_PRICE_5_CREDITS`
-8. **Apply `0009_credits.sql`** to prod Supabase (SQL editor)
-9. **Deploy**: push to main → Vercel auto-deploys
+### Prod state as of 2026-05-13
+- Migration `0009_credits.sql` applied to prod Supabase ✅
+- Stripe live mode: product "Tyr Report" with 2 prices ($6 / $15) ✅
+- Stripe webhook → `https://usetyr.com/api/stripe/webhook` for `checkout.session.completed` ✅
+- Vercel env vars set: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_1_CREDIT`, `STRIPE_PRICE_5_CREDITS` ✅
+- Supabase URL config: Site URL = `https://usetyr.com`, redirect URLs include `/auth/callback` ✅
+- Resend domain `usetyr.com` verified, SMTP sender `noreply@usetyr.com` ✅
+- Email confirmations re-enabled in Supabase Auth Settings ✅
 
-### M10 is next (after M9 live)
+### Post-M9 follow-ups (housekeeping)
+- Refund the $6 smoke-test charge in Stripe Dashboard → Payments
+- Confirm webhook delivered `200` in Stripe Dashboard → Webhooks → Recent deliveries
+- Optional: activate Card payment method in Stripe dashboard (not required since `payment_method_types=['card']` is now explicit, but useful if you ever want Apple Pay/Link/etc.)
+
+### M9.5 — Activities Builder + Internship preset (code-complete 2026-05-13)
+
+Plan: [.claude/plans/whimsical-gliding-tide.md](../../.claude/plans/whimsical-gliding-tide.md). Spec memory: [memory/project_m9_5_spec.md](../../.claude/projects/C--Users-noura-projects-ai-hiring-decoder/memory/project_m9_5_spec.md).
+
+**Shipped (code on disk, awaiting prod smoke test):**
+- Migration `0010_builder_and_internship.sql` — applied to prod 2026-05-13.
+  Extends `resumes.input_kind` to include `'builder'`, adds `is_internship`, `builder_input` jsonb, `builder_rewrites_used` int.
+- **Internship preset** wired through analyzer:
+  - `lib/llm/prompts.ts` — `internshipPreamble()` prepended to all 8 perception queries when `ctx.is_internship=true`
+  - `lib/agents/synthesize-summary-prompt.ts` — same preamble for the plain-summary prompt
+  - Cache namespace bumps: `apeds:v4 → v5`, `apeds_summary:v3 → v4`
+  - Both lockfiles regenerated (`lib/llm/prompts.lock.json` → v5, `lib/agents/synthesize-summary.lock.json` → v4)
+  - UI: `is_internship` checkbox in `components/upload/target-form.tsx`
+  - Plumbed through `app/api/upload/route.ts` → `resumes.is_internship` → `lib/agents/load-resume.ts` → `lib/agents/llm.ts` → perception context
+- **Activities Builder** at `/builder`:
+  - `lib/builder/{types,prompts,generate,rewrite,render}.ts` — structured input → Claude generation → JSON resume → markdown render for the perception graph
+  - `app/api/builder/route.ts` — credit-gated endpoint (requires `credits_remaining ≥ 1 AND credits_purchased ≥ 1`; signup-bonus credit is analyzer-only)
+  - `app/api/builder/rewrite-bullet/route.ts` — targeted bullet rewrites, capped at 5 per draft
+  - `app/builder/page.tsx` + `app/builder/[resumeId]/page.tsx` — form + scored preview
+  - `components/builder/{builder-form,builder-flow,builder-preview,print-styles.css}.tsx`
+  - Print export = `window.print()` against `@media print` stylesheet (no new deps)
+  - Reuses Stripe checkout flow for paywall ("buy credits to unlock the builder" variant copy)
+- Prompt-lock drift test added at `lib/builder/__tests__/prompts.test.ts` — 241/241 tests pass, `next build` clean.
+
+**Unique value:** the builder doesn't just generate a resume — it immediately runs the generated text through the same 4-LLM perception graph the analyzer uses, then lets the user surgically rewrite individual bullets within their 1-credit session (cap = 5 rewrites). Tyr-specific differentiator: no other resume builder shows live recruiter-AI scoring as you iterate.
+
+**Smoke-test checklist (run after push to main):**
+- Sign up fresh / use a 0-credit account → visit `/builder` → submit → expect `402 BUILDER_LOCKED` paywall.
+- Buy a credit pack via the paywall modal → return to `/builder` → submit form → wait for generation + scoring → land on `/builder/[resumeId]`.
+- Verify the resume renders, scores show, "🔁 Rewrite" appears on hover for bullets.
+- Click rewrite on one bullet → expect the bullet to update inline, rewrites counter decrements.
+- Repeat 5 more times → 6th click should return `429 REWRITE_LIMIT`.
+- Click "Print / save as PDF" → expect chrome-free print preview.
+- On the analyzer (`/upload`): tick "Applying to an internship", upload a junior resume, verify report renders without breaking. Same resume without the checkbox should produce a noticeably different seniority/missing-signal narrative.
+
+### After M9.5 — M10 carries over
 - Fix Llama silent (KNOWN_ISSUES 2.2): trigger one prod upload, pull Vercel logs for `[perceive] FAILED llama-3.3-70b`, fix `callLlama()` in `lib/llm/perceive.ts`
-- Integrate user's few-shot calibration examples → bump `apeds:v4 → v5`, regen lock
+- Few-shot calibration examples → bump cache namespace + regen lock
 - Legal pages: `app/privacy/page.tsx`, `app/terms/page.tsx`, update footer links from `#`
 - Hero video compression: `ffmpeg -i public/hero.mp4 -vf scale=-2:720 -crf 28 public/hero-720.mp4`
+- Per-bullet score badges in `/builder/[resumeId]` (only show 🔁 on weak bullets, not all)
+- Nav link or upload-page CTA pointing at `/builder`
 
 ---
 
@@ -66,25 +92,9 @@ lib/stripe.ts                       — NEW: Stripe singleton + CREDIT_PACKS def
 
 **Stats:** 235 tests, tsc + next build clean. Cache namespaces in use: `apeds:v4` (perception), `apeds_summary:v3` (summary).
 
-## M9 — Paywall + Onboarding Fix (in progress)
+## M9 — Paywall + Onboarding Fix (SHIPPED 2026-05-13)
 
-| Item | Status |
-|------|--------|
-| Stripe pay-per-report credits (1×$4, 5×$15) | ✅ Coded — needs env vars + migration applied to prod |
-| Migration `0009_credits.sql` | ✅ Written — apply to prod before deploying |
-| auth/callback error handling (OTP expired) | ✅ Fixed |
-| Login page OTP-expired banner | ✅ Added |
-| Upload route 402 paywall gate | ✅ Added |
-| Upload flow paywall modal + checkout | ✅ Added |
-| Account page credits card | ✅ Added |
-| Reports page history gating (free: 3 reports) | ✅ Added |
-| Supabase dashboard URL config verification | ⏳ User does this |
-| Resend domain verification (`noreply@usetyr.com`) | ⏳ User verifies |
-| Re-enable email confirmations | ⏳ After verification |
-| Stripe Dashboard: create products + price IDs | ⏳ User does this |
-| Add Stripe env vars to Vercel | ⏳ User does this |
-
-**Env vars needed before going live:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_1_CREDIT`, `STRIPE_PRICE_5_CREDITS` — see DEPLOY.md for the setup checklist.
+Live on prod. 1 free credit on signup, $6 / $15 packs via Stripe Checkout, webhook fulfilment. Email confirmations re-enabled.
 
 ## Post-M8 hot fixes (after the M8 close-out commit, in chronological order)
 

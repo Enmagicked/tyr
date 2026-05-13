@@ -1,0 +1,39 @@
+@media print {
+  /* Hide everything except the resume article */
+  body * {
+    visibility: hidden;
+  }
+  #builder-resume,
+  #builder-resume * {
+    visibility: visible;
+  }
+  #builder-resume {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 8.5in;
+    margin: 0 auto;
+    padding: 0.5in 0.6in;
+    background: white;
+    color: #1a1a1a;
+    font-size: 10.5pt;
+    line-height: 1.4;
+  }
+  /* Tighten typography for print */
+  #builder-resume h2 {
+    font-size: 20pt;
+  }
+  #builder-resume h3 {
+    font-size: 9pt;
+  }
+  /* Make sure links print as text not blue */
+  #builder-resume a {
+    color: inherit;
+    text-decoration: none;
+  }
+  /* Section break hints */
+  #builder-resume section {
+    break-inside: avoid;
+  }
+}
