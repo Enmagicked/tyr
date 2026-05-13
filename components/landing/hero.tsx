@@ -144,6 +144,14 @@ export function Hero() {
               View sample
             </Link>
           </div>
+          <Link
+            href="/builder"
+            onClick={() => posthog.capture('cta_click', { location: 'hero_tertiary', destination: '/builder' })}
+            className="mt-5 text-[13px] text-vellum/60 hover:text-vellum/90 underline underline-offset-4 decoration-vellum/30 hover:decoration-vellum/70 animate-fade-up transition-colors"
+            style={{ animationDelay: '0.38s' }}
+          >
+            No resume yet? Build one from your activities →
+          </Link>
         </div>
 
         {/* scroll cue */}

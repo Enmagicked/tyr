@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { UploadFlow } from '@/components/upload/upload-flow'
 import { CreditsAddedBanner } from '@/components/upload/credits-added-banner'
 import { LandingNav } from '@/components/landing/nav'
@@ -21,6 +22,15 @@ export default function UploadPage() {
           <p className="mt-4 text-driftwood max-w-md mx-auto leading-[1.72]">
             Tell us what role you are targeting so the AI judges read your
             resume against the right bar. Then drop your PDF.
+          </p>
+          <p className="mt-4 text-[13px] text-driftwood/80">
+            No resume yet?{' '}
+            <Link
+              href="/builder"
+              className="text-ink underline underline-offset-2 hover:text-marigold"
+            >
+              Build one from your activities →
+            </Link>
           </p>
         </div>
         <CreditsAddedBanner />
