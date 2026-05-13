@@ -1,6 +1,52 @@
 # tyr — current state
 
-> **Read this first** if you're a new Claude session. Snapshot as of 2026-05-10. The truth lives in code + commits; this doc summarizes intent, decisions, and what's broken.
+> **Read this first** if you're a new Claude session. Updated 2026-05-13 after M9 code-complete.
+
+---
+
+## ⚡ RESUME HERE (session handoff 2026-05-13)
+
+**M9 code is done. Changes are on disk but NOT yet committed.**
+
+### Uncommitted files (all M9 work — commit before pushing)
+```
+app/auth/callback/route.ts          — OTP expired error handling
+app/(auth)/login/page.tsx           — OTP-expired banner UI
+app/account/page.tsx                — credits card added
+app/api/stripe/checkout/route.ts    — NEW: Stripe checkout session creator
+app/api/stripe/webhook/route.ts     — NEW: webhook handler (checkout.session.completed)
+app/api/upload/route.ts             — 402 quota gate + credit decrement + is_priority
+app/reports/page.tsx                — history gating (free: 3 reports)
+app/upload/page.tsx                 — CreditsAddedBanner import
+components/account/account-actions.tsx  — AccountBuyCredits component added
+components/upload/credits-added-banner.tsx  — NEW: post-checkout success banner
+components/upload/upload-flow.tsx   — paywalled step + paywall modal + buyCredits()
+docs/DEPLOY.md                      — Stripe setup checklist added to §0
+docs/STATE.md                       — this file
+infra/supabase/migrations/0009_credits.sql  — NEW: credits_remaining, credits_purchased, stripe_customer_id, is_priority
+lib/stripe.ts                       — NEW: Stripe singleton + CREDIT_PACKS definition
+```
+
+### What the user still needs to do before M9 goes live
+1. `git add -A && git commit` — commit the M9 code
+2. **Supabase dashboard**: Site URL = `https://usetyr.com`, Redirect URLs include `https://usetyr.com/**` and `https://usetyr.com/auth/callback`
+3. **Resend dashboard**: confirm `usetyr.com` shows Verified (green DKIM+SPF); SMTP sender = `noreply@usetyr.com` in Supabase Auth → SMTP Settings
+4. **Re-enable email confirmations** in Supabase Auth Settings once steps 2–3 verified
+5. **Stripe Dashboard**: Products → create "Tyr Report" → two one-time prices ($4 / $15) → note Price IDs
+6. **Stripe Dashboard**: Webhooks → add endpoint `https://usetyr.com/api/stripe/webhook` → event `checkout.session.completed` → note signing secret
+7. **Vercel env vars**: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_1_CREDIT`, `STRIPE_PRICE_5_CREDITS`
+8. **Apply `0009_credits.sql`** to prod Supabase (SQL editor)
+9. **Deploy**: push to main → Vercel auto-deploys
+
+### M10 is next (after M9 live)
+- Fix Llama silent (KNOWN_ISSUES 2.2): trigger one prod upload, pull Vercel logs for `[perceive] FAILED llama-3.3-70b`, fix `callLlama()` in `lib/llm/perceive.ts`
+- Integrate user's few-shot calibration examples → bump `apeds:v4 → v5`, regen lock
+- Legal pages: `app/privacy/page.tsx`, `app/terms/page.tsx`, update footer links from `#`
+- Hero video compression: `ffmpeg -i public/hero.mp4 -vf scale=-2:720 -crf 28 public/hero-720.mp4`
+
+---
+
+> Truth lives in code + commits; this doc summarizes intent, decisions, and what's broken.
 
 ## Live deployment
 
@@ -19,6 +65,26 @@
 | M8 | Input expansion + viz + prompt eng bundle: paste/image-of-JD, URL/image-of-resume, 3 SVG charts, system prompt + reasoning-first JSON + injection defense + length cap + structured-output mode | `e144d70`–`5b446a3` | MILESTONE_8_VERIFICATION.md |
 
 **Stats:** 235 tests, tsc + next build clean. Cache namespaces in use: `apeds:v4` (perception), `apeds_summary:v3` (summary).
+
+## M9 — Paywall + Onboarding Fix (in progress)
+
+| Item | Status |
+|------|--------|
+| Stripe pay-per-report credits (1×$4, 5×$15) | ✅ Coded — needs env vars + migration applied to prod |
+| Migration `0009_credits.sql` | ✅ Written — apply to prod before deploying |
+| auth/callback error handling (OTP expired) | ✅ Fixed |
+| Login page OTP-expired banner | ✅ Added |
+| Upload route 402 paywall gate | ✅ Added |
+| Upload flow paywall modal + checkout | ✅ Added |
+| Account page credits card | ✅ Added |
+| Reports page history gating (free: 3 reports) | ✅ Added |
+| Supabase dashboard URL config verification | ⏳ User does this |
+| Resend domain verification (`noreply@usetyr.com`) | ⏳ User verifies |
+| Re-enable email confirmations | ⏳ After verification |
+| Stripe Dashboard: create products + price IDs | ⏳ User does this |
+| Add Stripe env vars to Vercel | ⏳ User does this |
+
+**Env vars needed before going live:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_1_CREDIT`, `STRIPE_PRICE_5_CREDITS` — see DEPLOY.md for the setup checklist.
 
 ## Post-M8 hot fixes (after the M8 close-out commit, in chronological order)
 

@@ -58,6 +58,24 @@ async function handleUpload(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Check credits before doing any work
+  const service = createServiceClient()
+  const { data: candidate } = await service
+    .from('candidates')
+    .select('credits_remaining')
+    .eq('id', user.id)
+    .single()
+
+  if (!candidate || (candidate.credits_remaining as number) <= 0) {
+    const posthog = getPostHogClient()
+    posthog.capture({ distinctId: user.id, event: 'quota_exhausted' })
+    await posthog.shutdown()
+    return NextResponse.json(
+      { error: 'No credits remaining', code: 'QUOTA_EXCEEDED' },
+      { status: 402 }
+    )
+  }
+
   const formData = await request.formData()
 
   // Common target fields (apply to every input kind)
@@ -140,7 +158,6 @@ async function handleUpload(request: Request) {
   }
 
   // Storage write + DB insert (uniform across input kinds)
-  const service = createServiceClient()
   const filePath = `${user.id}/${Date.now()}_${ingest.file_name}`
   const { error: storageError } = await service.storage
     .from('resumes')
@@ -153,6 +170,7 @@ async function handleUpload(request: Request) {
     return NextResponse.json({ error: 'Failed to store file' }, { status: 500 })
   }
 
+  const isPriority = (candidate.credits_remaining as number) > 0
   const { data: resume, error: dbError } = await service
     .from('resumes')
     .insert({
@@ -164,6 +182,7 @@ async function handleUpload(request: Request) {
       target_company: targetCompany,
       target_jd: targetJd || null,
       input_kind: inputKind,
+      is_priority: isPriority,
     })
     .select()
     .single()
@@ -172,6 +191,15 @@ async function handleUpload(request: Request) {
     console.error('[upload] db error:', dbError)
     return NextResponse.json({ error: 'Failed to save resume' }, { status: 500 })
   }
+
+  // Decrement the credit that was checked above
+  await service
+    .from('candidates')
+    .update({
+      credits_remaining: (candidate.credits_remaining as number) - 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', user.id)
 
   const posthog = getPostHogClient()
   posthog.capture({

@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { LandingNav } from '@/components/landing/nav'
-import { AccountActions } from '@/components/account/account-actions'
+import { AccountActions, AccountBuyCredits } from '@/components/account/account-actions'
 
 export const metadata = {
   title: 'Account — tyr',
@@ -28,10 +28,20 @@ export default async function AccountPage() {
 
   const service = createServiceClient()
 
-  const { count: reportCount } = await service
-    .from('resumes')
-    .select('id', { count: 'exact', head: true })
-    .eq('candidate_id', user.id)
+  const [{ count: reportCount }, { data: creditData }] = await Promise.all([
+    service
+      .from('resumes')
+      .select('id', { count: 'exact', head: true })
+      .eq('candidate_id', user.id),
+    service
+      .from('candidates')
+      .select('credits_remaining, credits_purchased')
+      .eq('id', user.id)
+      .single(),
+  ])
+
+  const creditsRemaining = (creditData?.credits_remaining as number | null) ?? 0
+  const creditsPurchased = (creditData?.credits_purchased as number | null) ?? 0
 
   return (
     <main className="min-h-screen bg-vellum">
@@ -75,6 +85,26 @@ export default async function AccountPage() {
               </dd>
             </div>
           </dl>
+        </div>
+
+        <div className="bg-paper border border-bone rounded-[14px] p-6 mb-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-driftwood mb-1">
+                Credits
+              </p>
+              <p className="text-ink text-sm">
+                <span className="font-medium">{creditsRemaining}</span> remaining
+                {creditsPurchased > 0 && (
+                  <span className="text-driftwood"> · {creditsPurchased} purchased</span>
+                )}
+              </p>
+              {creditsPurchased > 0 && (
+                <p className="text-[11px] text-sage mt-0.5">Full report history unlocked</p>
+              )}
+            </div>
+            <AccountBuyCredits />
+          </div>
         </div>
 
         <AccountActions email={user.email ?? ''} />

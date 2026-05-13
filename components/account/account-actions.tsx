@@ -5,6 +5,47 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import posthog from 'posthog-js'
 
+export function AccountBuyCredits() {
+  const [loading, setLoading] = useState<1 | 5 | null>(null)
+
+  async function buy(credits: 1 | 5) {
+    setLoading(credits)
+    posthog.capture('checkout_started', { credit_count: credits })
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credits }),
+      })
+      const { url, error } = await res.json()
+      if (!res.ok || !url) throw new Error(error ?? 'Could not start checkout')
+      window.location.href = url
+    } catch (err) {
+      console.error('checkout error:', err)
+      setLoading(null)
+    }
+  }
+
+  return (
+    <div className="flex gap-2 flex-shrink-0">
+      <button
+        onClick={() => buy(1)}
+        disabled={loading !== null}
+        className="text-[13px] font-medium px-4 py-2 rounded-full border border-bone bg-vellum/50 text-ink hover:bg-bone disabled:opacity-50 transition-colors"
+      >
+        {loading === 1 ? '…' : '1 decode · $4'}
+      </button>
+      <button
+        onClick={() => buy(5)}
+        disabled={loading !== null}
+        className="text-[13px] font-medium px-4 py-2 rounded-full bg-ink text-vellum hover:bg-ink/90 disabled:opacity-50 transition-colors"
+      >
+        {loading === 5 ? '…' : '5 decodes · $15'}
+      </button>
+    </div>
+  )
+}
+
 interface AccountActionsProps {
   email: string
 }

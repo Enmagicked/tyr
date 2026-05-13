@@ -6,7 +6,7 @@ import posthog from 'posthog-js'
 import { TargetForm } from './target-form'
 import { isValidTarget, type TargetInput } from './target-validation'
 
-type Step = 'idle' | 'uploading' | 'analyzing' | 'done' | 'error'
+type Step = 'idle' | 'uploading' | 'analyzing' | 'done' | 'error' | 'paywalled'
 
 const STEP_LABELS: Record<Step, string> = {
   idle: 'Ready',
@@ -14,6 +14,7 @@ const STEP_LABELS: Record<Step, string> = {
   analyzing: 'Analyzing — running parsers and AI models…',
   done: 'Done. Redirecting…',
   error: 'Something went wrong',
+  paywalled: 'Out of credits',
 }
 
 interface GraphEvent {
@@ -67,9 +68,10 @@ export function UploadFlow() {
   const [errorMsg, setErrorMsg] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const [currentNode, setCurrentNode] = useState<string | null>(null)
+  const [buyingCredits, setBuyingCredits] = useState(false)
 
   const targetReady = isValidTarget(target)
-  const isActive = step !== 'idle' && step !== 'error'
+  const isActive = step !== 'idle' && step !== 'error' && step !== 'paywalled'
   const urlReady = inputKind === 'url' && url.trim().length > 0
 
   // Common submit path. PDF / image branches pass a `file`; URL branch passes
@@ -110,6 +112,10 @@ export function UploadFlow() {
       if (inputKind === 'url') uploadForm.append('url', url.trim())
 
       const uploadRes = await fetch('/api/upload', { method: 'POST', body: uploadForm })
+      if (uploadRes.status === 402) {
+        setStep('paywalled')
+        return
+      }
       if (!uploadRes.ok) {
         const { error, hint } = await uploadRes.json()
         throw new Error(hint ? `${error} — ${hint}` : (error ?? 'Upload failed'))
@@ -178,6 +184,25 @@ export function UploadFlow() {
     if (file) submit(file)
   }
 
+  async function buyCredits(creditCount: 1 | 5) {
+    setBuyingCredits(true)
+    posthog.capture('checkout_started', { credit_count: creditCount })
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credits: creditCount }),
+      })
+      const { url, error } = await res.json()
+      if (!res.ok || !url) throw new Error(error ?? 'Could not start checkout')
+      window.location.href = url
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Checkout failed')
+      setStep('error')
+      setBuyingCredits(false)
+    }
+  }
+
   const dropzoneActive = inputKind !== 'url' && targetReady && !isActive
 
   return (
@@ -214,7 +239,38 @@ export function UploadFlow() {
         })}
       </div>
 
-      {isActive ? (
+      {step === 'paywalled' ? (
+        <div className="flex flex-col gap-5 rounded-2xl border border-bone bg-paper/60 p-8 text-center">
+          <div>
+            <p className="font-serif text-2xl text-ink mb-1">You&rsquo;re out of credits</p>
+            <p className="text-sm text-driftwood">
+              Buy a pack to keep decoding. Credits never expire.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={() => buyCredits(1)}
+              disabled={buyingCredits}
+              className="flex-1 rounded-full border border-bone bg-vellum/50 px-5 py-3 text-sm font-medium text-ink hover:bg-bone disabled:opacity-40 transition-colors"
+            >
+              {buyingCredits ? '…' : '1 decode — $4'}
+            </button>
+            <button
+              onClick={() => buyCredits(5)}
+              disabled={buyingCredits}
+              className="flex-1 rounded-full bg-ink px-5 py-3 text-sm font-medium text-vellum hover:bg-ink/90 disabled:opacity-40 transition-colors"
+            >
+              {buyingCredits ? '…' : '5 decodes — $15 (save 25%)'}
+            </button>
+          </div>
+          <button
+            onClick={() => setStep('idle')}
+            className="text-xs text-driftwood underline"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : isActive ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-driftwood/40 bg-paper/40 p-16 text-center">
           <Spinner />
           <p className="text-sm text-ink">{STEP_LABELS[step]}</p>

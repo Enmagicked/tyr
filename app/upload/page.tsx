@@ -1,4 +1,5 @@
 import { UploadFlow } from '@/components/upload/upload-flow'
+import { CreditsAddedBanner } from '@/components/upload/credits-added-banner'
 import { LandingNav } from '@/components/landing/nav'
 
 export const metadata = {
@@ -22,6 +23,7 @@ export default function UploadPage() {
             resume against the right bar. Then drop your PDF.
           </p>
         </div>
+        <CreditsAddedBanner />
         <UploadFlow />
       </div>
     </main>

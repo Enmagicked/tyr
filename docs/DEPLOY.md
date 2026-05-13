@@ -34,7 +34,21 @@ TOGETHER_API_KEY
 AFFINDA_API_KEY                   # optional — pipeline degrades gracefully if absent
 UPSTASH_REDIS_REST_URL
 UPSTASH_REDIS_REST_TOKEN
+STRIPE_SECRET_KEY                 # sk_live_... from Stripe Dashboard → Developers → API keys
+STRIPE_WEBHOOK_SECRET             # whsec_... from Stripe Dashboard → Webhooks (create endpoint first)
+STRIPE_PRICE_1_CREDIT             # price_... for the $4 / 1-credit product
+STRIPE_PRICE_5_CREDITS            # price_... for the $15 / 5-credit product
 ```
+
+Stripe setup checklist (do once before first deploy with billing live):
+1. Stripe Dashboard → Products → Create product "Tyr Report"
+   - Add price: $4.00 USD, one-time → note Price ID as `STRIPE_PRICE_1_CREDIT`
+   - Add price: $15.00 USD, one-time → note Price ID as `STRIPE_PRICE_5_CREDITS`
+2. Stripe Dashboard → Developers → Webhooks → Add endpoint
+   - URL: `https://usetyr.com/api/stripe/webhook`
+   - Events: `checkout.session.completed`
+   - Note the signing secret as `STRIPE_WEBHOOK_SECRET`
+3. Apply migration `0009_credits.sql` to prod Supabase before deploying
 
 ---
 

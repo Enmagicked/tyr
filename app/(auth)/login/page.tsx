@@ -14,6 +14,7 @@ function LoginForm() {
   const router = useRouter()
   const search = useSearchParams()
   const next = search.get('next') ?? '/upload'
+  const otpExpired = search.get('error') === 'otp_expired'
 
   async function login() {
     setLoading(true)
@@ -42,6 +43,19 @@ function LoginForm() {
           </Link>
           <p className="text-sm text-driftwood mt-2">Sign in</p>
         </div>
+
+        {otpExpired && (
+          <div className="rounded-lg border border-clay/30 bg-clay/5 px-4 py-3 text-sm text-clay">
+            <p className="font-medium mb-1">Confirmation link expired</p>
+            <p className="text-xs text-clay/80">
+              Email confirmation links expire after 1 hour.{' '}
+              <Link href="/signup" className="underline">
+                Sign up again
+              </Link>{' '}
+              to receive a fresh link, or sign in if your account is already confirmed.
+            </p>
+          </div>
+        )}
 
         <div className="flex flex-col gap-3">
           <input

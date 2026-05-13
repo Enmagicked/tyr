@@ -36,16 +36,30 @@ export default async function ReportsPage() {
 
   const service = createServiceClient()
 
+  const { data: creditData } = await service
+    .from('candidates')
+    .select('credits_purchased')
+    .eq('id', user.id)
+    .single()
+
+  const hasPurchased = ((creditData?.credits_purchased as number | null) ?? 0) > 0
+  const FREE_HISTORY_LIMIT = 3
+
   // Pull in three queries in parallel and join client-side. Cheaper than a
   // Postgres join through PostgREST and keeps the queries readable.
-  const { data: resumes } = await service
+  const resumeQuery = service
     .from('resumes')
     .select('id, file_name, target_role, target_company, created_at')
     .eq('candidate_id', user.id)
     .order('created_at', { ascending: false })
-    .returns<ResumeRow[]>()
 
-  const resumeIds = (resumes ?? []).map((r) => r.id)
+  if (!hasPurchased) resumeQuery.limit(FREE_HISTORY_LIMIT + 1) // +1 to detect if more exist
+
+  const { data: resumes } = await resumeQuery.returns<ResumeRow[]>()
+  const hasHiddenReports = !hasPurchased && (resumes?.length ?? 0) > FREE_HISTORY_LIMIT
+  const visibleResumes = !hasPurchased ? (resumes ?? []).slice(0, FREE_HISTORY_LIMIT) : (resumes ?? [])
+
+  const resumeIds = visibleResumes.map((r) => r.id)
   const [{ data: disagreements }, { data: perceptions }] = await Promise.all([
     resumeIds.length > 0
       ? service
@@ -70,7 +84,7 @@ export default async function ReportsPage() {
     (perceptions ?? []).map((p) => [p.resume_id, p.ai_legibility_score])
   )
 
-  const rows: ReportRowData[] = (resumes ?? []).map((r) => {
+  const rows: ReportRowData[] = visibleResumes.map((r) => {
     const overall = disagreementMap.get(r.id) ?? null
     return {
       id: r.id,
@@ -125,6 +139,20 @@ export default async function ReportsPage() {
             {rows.map((row) => (
               <ReportRow key={row.id} row={row} />
             ))}
+            {hasHiddenReports && (
+              <div className="rounded-[14px] border border-bone bg-paper/60 p-8 text-center">
+                <p className="font-serif text-xl text-ink mb-1">Older reports are archived</p>
+                <p className="text-sm text-driftwood mb-5">
+                  Buy any credit pack to unlock your full report history.
+                </p>
+                <Link
+                  href="/account"
+                  className="inline-block text-sm font-medium px-5 py-2 rounded-full bg-ink text-vellum hover:bg-ink/90 transition-colors"
+                >
+                  Unlock history →
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </div>
