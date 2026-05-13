@@ -33,7 +33,7 @@ export function AccountBuyCredits() {
         disabled={loading !== null}
         className="text-[13px] font-medium px-4 py-2 rounded-full border border-bone bg-vellum/50 text-ink hover:bg-bone disabled:opacity-50 transition-colors"
       >
-        {loading === 1 ? '…' : '1 decode · $4'}
+        {loading === 1 ? '…' : '1 decode · $6'}
       </button>
       <button
         onClick={() => buy(5)}

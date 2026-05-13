@@ -253,14 +253,14 @@ export function UploadFlow() {
               disabled={buyingCredits}
               className="flex-1 rounded-full border border-bone bg-vellum/50 px-5 py-3 text-sm font-medium text-ink hover:bg-bone disabled:opacity-40 transition-colors"
             >
-              {buyingCredits ? '…' : '1 decode — $4'}
+              {buyingCredits ? '…' : '1 decode — $6'}
             </button>
             <button
               onClick={() => buyCredits(5)}
               disabled={buyingCredits}
               className="flex-1 rounded-full bg-ink px-5 py-3 text-sm font-medium text-vellum hover:bg-ink/90 disabled:opacity-40 transition-colors"
             >
-              {buyingCredits ? '…' : '5 decodes — $15 (save 25%)'}
+              {buyingCredits ? '…' : '5 decodes — $15 (save 50%)'}
             </button>
           </div>
           <button

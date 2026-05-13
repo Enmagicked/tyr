@@ -17,7 +17,7 @@ export const CREDIT_PACKS = [
   {
     credits: 1,
     label: '1 decode',
-    price: '$4',
+    price: '$6',
     priceEnvKey: 'STRIPE_PRICE_1_CREDIT',
   },
   {
