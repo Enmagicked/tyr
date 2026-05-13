@@ -10,6 +10,11 @@ export interface TargetInput {
   // fit / top_strengths / missing_signal perception queries so the LLMs read
   // the resume against actual JD requirements, not just the role title.
   target_jd: string
+  // M9.5: internship preset. When true, prepends an INTERNSHIP CONTEXT
+  // preamble to every perception query so the recruiter persona calibrates
+  // for student / new-grad funnel rather than the default senior-engineer
+  // baseline.
+  is_internship: boolean
 }
 
 export interface TargetValidation {
@@ -53,7 +58,12 @@ export function validateTarget(raw: Partial<TargetInput>): TargetValidation {
   return {
     ok: Object.keys(errors).length === 0,
     errors,
-    normalized: { target_role: role, target_company: company, target_jd: jd },
+    normalized: {
+      target_role: role,
+      target_company: company,
+      target_jd: jd,
+      is_internship: !!raw.is_internship,
+    },
   }
 }
 

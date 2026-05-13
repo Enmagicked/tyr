@@ -140,9 +140,15 @@ test('perceiveCacheKey: differs across model / query / text', () => {
   assert.notEqual(base, perceiveCacheKey('gpt-4o', 'seniority', 'r2'))
 })
 
-test('perceiveCacheKey: namespaced under apeds:v4 (M8.B bumped from v3)', () => {
+test('perceiveCacheKey: namespaced under apeds:v5 (M9.5 bumped from v4)', () => {
   const k = perceiveCacheKey('llama-3.3-70b', 'ai_authored', 'x')
-  assert.ok(k.startsWith('apeds:v4:llama-3.3-70b:ai_authored:'))
+  assert.ok(k.startsWith('apeds:v5:llama-3.3-70b:ai_authored:'))
+})
+
+test('M9.5 perceiveCacheKey: is_internship flag changes the key', () => {
+  const off = perceiveCacheKey('gpt-4o', 'seniority', 'r', { target_role: 'SWE Intern' })
+  const on = perceiveCacheKey('gpt-4o', 'seniority', 'r', { target_role: 'SWE Intern', is_internship: true })
+  assert.notEqual(off, on, 'is_internship must affect cache key')
 })
 
 test('M8.B perceiveCacheKey: same resume + different target_jd → different keys', () => {

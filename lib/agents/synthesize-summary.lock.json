@@ -1,7 +1,7 @@
 {
-  "version": "v3",
-  "comment": "SHA-256 (truncated to 16 hex chars) of buildPrompt() rendered against SUMMARY_SENTINEL_ARGS in synthesize-summary-prompt.ts. Run npm test (lib/agents/__tests__/synthesize-summary.test.ts) — it asserts the live hash equals this. v3 (post-M8 follow-up): expanded the banned-phrases list with meta-commentary about LLM/parser response counts ('X of N judges', 'partial picture', 'directional not definitive') and removed n_llms_responding / n_parsers_responding from the prompt's input section so the model can't see and reference those counts. Cache namespace bumped apeds_summary:v2 → v3 in lockstep. When you intentionally change the prompt, regenerate via the failing test message and bump the cache namespace (apeds_summary:vN → vN+1) in synthesize-summary.ts so stale completions don't get returned.",
+  "version": "v4",
+  "comment": "SHA-256 (truncated to 16 hex chars) of buildPrompt() rendered against SUMMARY_SENTINEL_ARGS in synthesize-summary-prompt.ts. Run npm test (lib/agents/__tests__/synthesize-summary.test.ts) — it asserts the live hash equals this. v3 (post-M8 follow-up): expanded banned-phrases list with meta-commentary about LLM/parser response counts and removed n_llms_responding / n_parsers_responding from the prompt's input section. v4 (M9.5): added INTERNSHIP CONTEXT preamble prepended when isInternship=true. Cache namespace bumped apeds_summary:v3 → v4 in lockstep, and the cache key now includes is_internship so intern vs non-intern runs don't collide. When you intentionally change the prompt, regenerate via the failing test message and bump the cache namespace (apeds_summary:vN → vN+1) in synthesize-summary.ts so stale completions don't get returned.",
   "hashes": {
-    "buildPrompt": "7a3eb29b7cd3eaa7"
+    "buildPrompt": "5a0b4a70a409200d"
   }
 }

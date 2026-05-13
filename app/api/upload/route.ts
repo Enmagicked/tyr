@@ -87,6 +87,7 @@ async function handleUpload(request: Request) {
     typeof targetCompanyRaw === 'string' ? targetCompanyRaw.trim() : ''
   const targetJd =
     typeof targetJdRaw === 'string' ? targetJdRaw.trim() : ''
+  const isInternship = formData.get('is_internship') === 'true'
 
   if (targetRole.length < 2 || targetRole.length > 80) {
     return NextResponse.json(
@@ -183,6 +184,7 @@ async function handleUpload(request: Request) {
       target_jd: targetJd || null,
       input_kind: inputKind,
       is_priority: isPriority,
+      is_internship: isInternship,
     })
     .select()
     .single()
@@ -210,6 +212,7 @@ async function handleUpload(request: Request) {
       target_role: targetRole,
       has_target_company: targetCompany.length > 0,
       has_target_jd: targetJd.length > 0,
+      is_internship: isInternship,
       input_kind: inputKind,
       source_url: ingest.source_url,
       bytes_stored: ingest.storage_buffer.byteLength,

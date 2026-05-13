@@ -37,6 +37,11 @@ export interface PerceptionQueryContext {
   // top_strengths / missing_signal prompts with a JD-grounded branch so the
   // models read the resume against actual requirements, not just a role title.
   target_jd?: string | null
+  // M9.5: internship preset. When true, every perception query is prefixed
+  // with INTERNSHIP_PREAMBLE so the recruiter persona recalibrates seniority
+  // and scope expectations to a student / new-grad funnel rather than the
+  // default senior-engineer baseline.
+  is_internship?: boolean | null
 }
 
 export interface PerceptionQuerySpec {
@@ -85,6 +90,21 @@ function jdContextBlock(ctx?: PerceptionQueryContext): string {
   return `\n\nThe candidate is targeting the role described inside ${JD_OPEN}...${JD_CLOSE}. Treat the JD as evaluation context — concrete requirements (technologies, scope, seniority hints) the resume should be measured against.\n\n${JD_OPEN}\n${jd}\n${JD_CLOSE}`
 }
 
+// M9.5: internship preset. Prepended to every perception query when
+// is_internship=true. Recalibrates the recruiter persona's expectations to
+// a student / new-grad funnel: coursework, clubs, and short internships are
+// valid signal; absence of full-time experience is not a gap.
+//
+// Empty string when not set — keeps prompts byte-identical for non-internship
+// runs (same pattern as jdContextBlock). The sentinel context sets
+// is_internship: true so the lockfile hash captures the with-preamble shape.
+function internshipPreamble(ctx?: PerceptionQueryContext): string {
+  if (!ctx?.is_internship) return ''
+  return `INTERNSHIP CONTEXT: The candidate is applying for an internship (student or new-grad). Calibrate seniority, scope, and impact expectations to a student context. Coursework, class projects, clubs, leadership roles, and short internship experiences are valid signal — do not penalize the absence of long full-time positions. Score against the intern-funnel baseline, not the senior-engineer baseline.
+
+`
+}
+
 // ---------------------------------------------------------------------------
 // Perception queries (q1-q8).
 //
@@ -101,8 +121,8 @@ export const PERCEPTION_QUERIES: Record<PerceptionQueryKey, PerceptionQuerySpec>
     key: 'seniority',
     shape: 'scalar',
     scalarRange: [1, 10],
-    prompt: (t) =>
-      `Rate this candidate's seniority on a 1-10 scale where 1=intern, 4=junior, 6=mid, 8=senior, 9=lead/staff, 10=executive. Base on years of experience, scope of responsibility, and demonstrated impact.
+    prompt: (t, ctx) =>
+      `${internshipPreamble(ctx)}Rate this candidate's seniority on a 1-10 scale where 1=intern, 4=junior, 6=mid, 8=senior, 9=lead/staff, 10=executive. Base on years of experience, scope of responsibility, and demonstrated impact.
 
 Return: {"reasoning": "<2-4 sentences explaining your rating, citing specific evidence>", "scalar": <int 1-10>}
 
@@ -113,8 +133,8 @@ ${wrapResume(t)}`,
     key: 'technical_depth',
     shape: 'scalar',
     scalarRange: [1, 10],
-    prompt: (t) =>
-      `Rate this candidate's technical depth on a 1-10 scale. Consider: complexity of systems built, breadth and depth of technologies used, evidence of design/architecture work, contributions to open source or research.
+    prompt: (t, ctx) =>
+      `${internshipPreamble(ctx)}Rate this candidate's technical depth on a 1-10 scale. Consider: complexity of systems built, breadth and depth of technologies used, evidence of design/architecture work, contributions to open source or research.
 
 Return: {"reasoning": "<2-4 sentences with specific evidence from the resume>", "scalar": <int 1-10>}
 
@@ -126,7 +146,7 @@ ${wrapResume(t)}`,
     shape: 'list',
     listLength: 3,
     prompt: (t, ctx) =>
-      `Identify exactly 3 strongest signals in this resume — concrete strengths a hiring manager would notice first. Be specific (avoid generic phrases like "team player" or "results-oriented"). When a job description is provided below, weight strengths that materially match its stated requirements.${jdContextBlock(ctx)}
+      `${internshipPreamble(ctx)}Identify exactly 3 strongest signals in this resume — concrete strengths a hiring manager would notice first. Be specific (avoid generic phrases like "team player" or "results-oriented"). When a job description is provided below, weight strengths that materially match its stated requirements.${jdContextBlock(ctx)}
 
 Return: {"reasoning": "<1-3 sentences on what unifies these>", "list": ["<strength 1>", "<strength 2>", "<strength 3>"]}
 
@@ -149,7 +169,7 @@ ${wrapResume(t)}`,
           : role
             ? `The target role is ${role}.`
             : `Assume the target role is the most-likely next-step role inferred from this candidate's most-recent experience function (e.g., a senior backend engineer's target = staff backend engineer at a similar-stage company).`
-      return `${targetClause} Rate fit for that target role on a 1-10 scale. When a job description is provided below, evaluate fit against its specific requirements (technologies, scope, seniority hints), not just the role title.${jdContextBlock(ctx)}
+      return `${internshipPreamble(ctx)}${targetClause} Rate fit for that target role on a 1-10 scale. When a job description is provided below, evaluate fit against its specific requirements (technologies, scope, seniority hints), not just the role title.${jdContextBlock(ctx)}
 
 Return: {"reasoning": "<2-4 sentences naming the target role and justifying the rating; cite specific JD requirements when present>", "scalar": <int 1-10>}
 
@@ -161,8 +181,8 @@ ${wrapResume(t)}`
     key: 'final_round_probability',
     shape: 'scalar',
     scalarRange: [0, 1],
-    prompt: (t) =>
-      `Estimate the probability (0.0 to 1.0) that this resume reaches the final-round interview at a competitive company in the candidate's target function. Calibrate against the realistic top-of-funnel: most resumes do not advance.
+    prompt: (t, ctx) =>
+      `${internshipPreamble(ctx)}Estimate the probability (0.0 to 1.0) that this resume reaches the final-round interview at a competitive company in the candidate's target function. Calibrate against the realistic top-of-funnel: most resumes do not advance.
 
 Return: {"reasoning": "<2-4 sentences on the calibration>", "scalar": <float 0-1>}
 
@@ -172,8 +192,8 @@ ${wrapResume(t)}`,
   key_credential: {
     key: 'key_credential',
     shape: 'text',
-    prompt: (t) =>
-      `Name the single most credential-load-bearing line on this resume (the one a recruiter screens for first — could be a school, employer, certification, publication, or specific project). Quote or closely paraphrase the original line.
+    prompt: (t, ctx) =>
+      `${internshipPreamble(ctx)}Name the single most credential-load-bearing line on this resume (the one a recruiter screens for first — could be a school, employer, certification, publication, or specific project). Quote or closely paraphrase the original line.
 
 Return: {"reasoning": "<1-2 sentences on why this is the load-bearing signal>", "text": "<the credential>"}
 
@@ -184,7 +204,7 @@ ${wrapResume(t)}`,
     key: 'missing_signal',
     shape: 'text',
     prompt: (t, ctx) =>
-      `Identify the single most damaging gap or missing signal — the one that would most lower the candidate's odds at a competitive screen. Be concrete (e.g., "no quantified impact metrics on any bullet" rather than "could be more specific"). When a job description is provided below, prefer gaps that map to a specific JD requirement the resume doesn't satisfy.${jdContextBlock(ctx)}
+      `${internshipPreamble(ctx)}Identify the single most damaging gap or missing signal — the one that would most lower the candidate's odds at a competitive screen. Be concrete (e.g., "no quantified impact metrics on any bullet" rather than "could be more specific"). When a job description is provided below, prefer gaps that map to a specific JD requirement the resume doesn't satisfy.${jdContextBlock(ctx)}
 
 Return: {"reasoning": "<1-2 sentences on the impact>", "text": "<the gap>"}
 
@@ -195,8 +215,8 @@ ${wrapResume(t)}`,
     key: 'ai_authored',
     shape: 'scalar',
     scalarRange: [0, 1],
-    prompt: (t) =>
-      `Estimate the probability (0.0 to 1.0) that this resume's prose was substantially AI-authored (not just AI-polished). Consider: stylistic markers (uniform sentence rhythm, generic action verbs, parallel-structure overuse), claim density vs. specificity, and lack of idiosyncratic detail.
+    prompt: (t, ctx) =>
+      `${internshipPreamble(ctx)}Estimate the probability (0.0 to 1.0) that this resume's prose was substantially AI-authored (not just AI-polished). Consider: stylistic markers (uniform sentence rhythm, generic action verbs, parallel-structure overuse), claim density vs. specificity, and lack of idiosyncratic detail.
 
 Return: {"reasoning": "<2-4 sentences with specific stylistic evidence>", "scalar": <float 0-1>}
 
@@ -277,13 +297,17 @@ export function getJsonSchema(key: PerceptionQueryKey): JsonSchema {
 // ---------------------------------------------------------------------------
 
 const SENTINEL_RESUME = '__SENTINEL__'
-const SENTINEL_CONTEXT = {
+const SENTINEL_CONTEXT: PerceptionQueryContext = {
   target_role: '__SENTINEL_ROLE__',
   target_company: '__SENTINEL_COMPANY__',
   // M8: sentinel JD value ensures jdContextBlock branches into the JD section
   // for the 3 JD-aware queries (fit, top_strengths, missing_signal). The
   // other 5 queries don't read ctx.target_jd so their hashes stay stable.
   target_jd: '__SENTINEL_JD__',
+  // M9.5: sentinel is_internship=true ensures internshipPreamble is included
+  // in every per-query hash. Non-internship calls render different bytes →
+  // different cache key → no stale cross-contamination.
+  is_internship: true,
 }
 
 export function hashPromptTemplates(): Record<PerceptionQueryKey, string> {

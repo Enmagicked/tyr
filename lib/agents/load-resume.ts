@@ -9,6 +9,7 @@ export interface LoadResumeResult {
   target_role?: string | null
   target_company?: string | null
   target_jd?: string | null
+  is_internship?: boolean | null
 }
 
 export async function loadResume(ctx: Context): Promise<LoadResumeResult> {
@@ -22,6 +23,7 @@ export async function loadResume(ctx: Context): Promise<LoadResumeResult> {
       target_role: (ctx.target_role as string | undefined) ?? null,
       target_company: (ctx.target_company as string | undefined) ?? null,
       target_jd: (ctx.target_jd as string | undefined) ?? null,
+      is_internship: (ctx.is_internship as boolean | undefined) ?? null,
     }
   }
 
@@ -54,5 +56,6 @@ export async function loadResume(ctx: Context): Promise<LoadResumeResult> {
     target_role: resume.target_role ?? null,
     target_company: resume.target_company ?? null,
     target_jd: resume.target_jd ?? null,
+    is_internship: resume.is_internship ?? null,
   }
 }

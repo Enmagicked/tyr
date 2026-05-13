@@ -37,7 +37,8 @@ export { hashSummaryPromptTemplate } from './synthesize-summary-prompt.ts'
 function summaryCacheKey(
   resumeId: string,
   features: ApedsRawFeatures,
-  bulletAnalysis: BulletAnalysis
+  bulletAnalysis: BulletAnalysis,
+  isInternship: boolean
 ): string {
   // Hash the inputs that determine summary content. resume_id alone isn't
   // enough — features/bullets can change as the upstream pipeline evolves.
@@ -56,7 +57,12 @@ function summaryCacheKey(
   // judges responded", "partial picture", "directional, not definitive")
   // AND removed n_parsers_responding / n_llms_responding from the prompt
   // input section so the model literally can't see those numbers.
-  return `apeds_summary:v3:${resumeId}:${featuresHash}:${bulletHash}`
+  // M9.5: v3 → v4. Added INTERNSHIP CONTEXT preamble that recalibrates the
+  // recruiter persona for student / new-grad funnel. is_internship is now
+  // also folded into the key so intern vs non-intern runs of the same
+  // resume produce distinct summaries.
+  const intern = isInternship ? '1' : '0'
+  return `apeds_summary:v4:${resumeId}:${featuresHash}:${bulletHash}:${intern}`
 }
 
 // ---------------------------------------------------------------------------
@@ -182,9 +188,10 @@ export async function synthesizeSummary(ctx: Context): Promise<PlainSummary | nu
     const fileName = loaded?.file_name ?? 'resume.pdf'
     const targetRole = loaded?.target_role ?? null
     const targetCompany = loaded?.target_company ?? null
+    const isInternship = !!loaded?.is_internship
 
     // Cache lookup
-    const key = summaryCacheKey(resumeId, features, bulletAnalysis)
+    const key = summaryCacheKey(resumeId, features, bulletAnalysis, isInternship)
     const cached = await cacheGet<PlainSummary>(key)
     if (cached) return cached
 
@@ -197,6 +204,7 @@ export async function synthesizeSummary(ctx: Context): Promise<PlainSummary | nu
       topStrengths,
       missingSignal,
       keyCredential,
+      isInternship,
     })
 
     const text = await callClaude(prompt)

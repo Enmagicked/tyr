@@ -105,6 +105,24 @@ test('M8.B: target_jd context is OMITTED from fit / top_strengths / missing_sign
   }
 })
 
+test('M9.5: is_internship=true prepends INTERNSHIP CONTEXT to every query', () => {
+  const sentinel = '__TEST_RESUME__'
+  const ctx = { target_role: 'SWE Intern', is_internship: true }
+  for (const key of PERCEPTION_QUERY_KEYS) {
+    const rendered = PERCEPTION_QUERIES[key].prompt(sentinel, ctx)
+    assert.ok(rendered.includes('INTERNSHIP CONTEXT:'), `${key}: must include INTERNSHIP CONTEXT preamble when is_internship=true`)
+  }
+})
+
+test('M9.5: is_internship absent → no INTERNSHIP CONTEXT preamble', () => {
+  const sentinel = '__TEST_RESUME__'
+  const ctxOff = { target_role: 'SWE Intern' }
+  for (const key of PERCEPTION_QUERY_KEYS) {
+    const rendered = PERCEPTION_QUERIES[key].prompt(sentinel, ctxOff)
+    assert.ok(!rendered.includes('INTERNSHIP CONTEXT:'), `${key}: must NOT include INTERNSHIP CONTEXT when is_internship absent`)
+  }
+})
+
 test('M8.B: 5 non-JD-aware queries IGNORE target_jd (sentinel hash unchanged regardless)', () => {
   const sentinel = '__TEST_RESUME__'
   const noJd = { target_role: 'X', target_company: 'Y' }

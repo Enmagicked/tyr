@@ -24,8 +24,9 @@ function targetContext(ctx: Context): PerceptionQueryContext | undefined {
   const role = loaded.target_role
   const company = loaded.target_company
   const jd = loaded.target_jd
-  if (!role && !company && !jd) return undefined
-  return { target_role: role, target_company: company, target_jd: jd }
+  const isIntern = loaded.is_internship
+  if (!role && !company && !jd && !isIntern) return undefined
+  return { target_role: role, target_company: company, target_jd: jd, is_internship: isIntern }
 }
 
 export async function perceiveGPT4o(ctx: Context): Promise<PerceiveResult[]> {

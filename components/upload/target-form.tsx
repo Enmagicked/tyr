@@ -101,6 +101,26 @@ export function TargetForm({ value, onChange, disabled }: TargetFormProps) {
         </label>
       </div>
 
+      <label className="mt-4 flex items-start gap-2.5 cursor-pointer group">
+        <input
+          type="checkbox"
+          checked={value.is_internship}
+          onChange={(e) =>
+            onChange({ ...value, is_internship: e.target.checked })
+          }
+          disabled={disabled}
+          className="mt-0.5 h-4 w-4 rounded border-bone text-ink focus:ring-thistle/30 disabled:opacity-50"
+        />
+        <span className="flex flex-col gap-0.5 text-[12px] text-driftwood/90 leading-relaxed">
+          <span className="font-medium text-ink">Applying to an internship</span>
+          <span className="text-driftwood/80">
+            Recalibrates the 4 recruiter-AIs to a student / new-grad funnel
+            — coursework, clubs, and short experiences count as signal, and
+            absence of full-time roles isn&apos;t flagged as a gap.
+          </span>
+        </span>
+      </label>
+
       <p className="mt-4 text-[12px] text-driftwood/80 leading-relaxed">
         The fit query asks each LLM how well your resume reads against this
         target. Company is optional — leave it blank for a role-only read.

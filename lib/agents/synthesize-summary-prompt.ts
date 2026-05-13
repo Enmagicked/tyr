@@ -65,6 +65,9 @@ export interface BuildPromptArgs {
   topStrengths: string[] | null
   missingSignal: string | null
   keyCredential: string | null
+  // M9.5: internship preset — recalibrates the summary's prose for the
+  // student / new-grad funnel.
+  isInternship?: boolean
 }
 
 export function buildPrompt(args: BuildPromptArgs): string {
@@ -77,7 +80,17 @@ export function buildPrompt(args: BuildPromptArgs): string {
     topStrengths,
     missingSignal,
     keyCredential,
+    isInternship,
   } = args
+
+  // M9.5: prepend an internship preamble to recalibrate the recruiter persona's
+  // tone for a student / new-grad funnel. Empty string when off keeps the
+  // prompt byte-identical for non-internship runs.
+  const internshipPreamble = isInternship
+    ? `INTERNSHIP CONTEXT: This candidate is applying for internships. Calibrate every paragraph and every recommendation to a student / new-grad context — coursework, clubs, projects, and short internship stints are valid signal, not gaps. Do not frame "no full-time experience" as a weakness.
+
+`
+    : ''
 
   // M6: company is optional. Three branches mirror the perception `fit` prompt.
   const target =
@@ -99,7 +112,7 @@ export function buildPrompt(args: BuildPromptArgs): string {
   // schema instruction to ask for a 1-sentence honest acknowledgement.
   const noBullets = bulletAnalysis.aggregate.total_bullets === 0
 
-  return `You are writing a plain-English explanation of a resume analysis report for the candidate themselves. The reader is NOT technical — they have never seen σ, ρ, "embedding cosine," or "inter-modal δ" before.
+  return `${internshipPreamble}You are writing a plain-English explanation of a resume analysis report for the candidate themselves. The reader is NOT technical — they have never seen σ, ρ, "embedding cosine," or "inter-modal δ" before.
 
 # Hard rules
 
@@ -220,6 +233,11 @@ const SUMMARY_SENTINEL_ARGS: BuildPromptArgs = {
   topStrengths: ['__S1__', '__S2__', '__S3__'],
   missingSignal: '__SENTINEL_GAP__',
   keyCredential: '__SENTINEL_CREDENTIAL__',
+  // M9.5: sentinel isInternship=true so the lockfile hash captures the
+  // with-preamble rendering. Non-intern calls produce a different rendered
+  // string and a different cache key (apeds_summary:v4 includes is_internship
+  // in the key construction below).
+  isInternship: true,
 }
 
 export function hashSummaryPromptTemplate(): string {

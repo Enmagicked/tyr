@@ -15,6 +15,9 @@
 // M8 cache bump: apeds:v2 → apeds:v3. Reason: prompt template added system
 // message, reasoning-first JSON schema, <resume_text> delimiters. All v2
 // entries are now stale-keyed.
+// M9.5 cache bump: apeds:v4 → apeds:v5. Reason: internshipPreamble injected
+// into every query prompt when ctx.is_internship=true; cache key also now
+// includes is_internship flag.
 
 import { createHash } from 'node:crypto'
 import OpenAI from 'openai'
@@ -319,6 +322,9 @@ function hash(s: string): string {
 //        cache key now incorporates target_jd so JD vs no-JD runs of the
 //        same resume miss cache and produce distinct responses — same
 //        invariant as the M4 target_role/target_company addition).
+// M9.5: v4 → v5 (is_internship added to all 8 queries via internshipPreamble;
+//        cache key now incorporates is_internship so intern vs non-intern
+//        runs of the same resume miss cache).
 //
 // Cache key uses the TRUNCATED resume text so the key matches what was
 // actually scored. Same target context → same cache key.
@@ -331,8 +337,9 @@ export function perceiveCacheKey(
   const role = context?.target_role?.trim() ?? ''
   const company = context?.target_company?.trim() ?? ''
   const jd = context?.target_jd?.trim() ?? ''
-  const h = hash(`${model}␟${queryKey}␟${truncatedResumeText}␟${role}␟${company}␟${jd}`).slice(0, 32)
-  return `apeds:v4:${model}:${queryKey}:${h}`
+  const intern = context?.is_internship ? '1' : '0'
+  const h = hash(`${model}␟${queryKey}␟${truncatedResumeText}␟${role}␟${company}␟${jd}␟${intern}`).slice(0, 32)
+  return `apeds:v5:${model}:${queryKey}:${h}`
 }
 
 // ---------------------------------------------------------------------------

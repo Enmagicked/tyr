@@ -62,7 +62,7 @@ export function UploadFlow() {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState<Step>('idle')
-  const [target, setTarget] = useState<TargetInput>({ target_role: '', target_company: '', target_jd: '' })
+  const [target, setTarget] = useState<TargetInput>({ target_role: '', target_company: '', target_jd: '', is_internship: false })
   const [inputKind, setInputKind] = useState<InputKind>('pdf')
   const [url, setUrl] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
@@ -97,6 +97,7 @@ export function UploadFlow() {
       target_role: target.target_role.trim(),
       has_target_company: target.target_company.trim().length > 0,
       has_target_jd: target.target_jd.trim().length > 0,
+      is_internship: target.is_internship,
       input_kind: inputKind,
       file_size_bytes: file?.size,
     })
@@ -108,6 +109,7 @@ export function UploadFlow() {
       uploadForm.append('target_role', target.target_role.trim())
       uploadForm.append('target_company', target.target_company.trim())
       uploadForm.append('target_jd', target.target_jd.trim())
+      uploadForm.append('is_internship', target.is_internship ? 'true' : 'false')
       if (file) uploadForm.append('file', file)
       if (inputKind === 'url') uploadForm.append('url', url.trim())
 
