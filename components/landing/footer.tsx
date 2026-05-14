@@ -13,9 +13,8 @@ const COLUMNS = [
   {
     label: 'Company',
     links: [
-      { label: 'About', href: '#' },
-      { label: 'Privacy', href: '#' },
-      { label: 'Terms', href: '#' },
+      { label: 'Privacy', href: '/privacy' },
+      { label: 'Terms', href: '/terms' },
     ],
   },
 ]

@@ -44,8 +44,15 @@ export function BuilderPreview({
         }),
       })
       if (!r.ok) {
-        const { error } = await r.json().catch(() => ({ error: `HTTP ${r.status}` }))
-        throw new Error(error ?? 'Rewrite failed')
+        const { error, code } = (await r.json().catch(() => ({}))) as {
+          error?: string
+          code?: string
+        }
+        if (code === 'REWRITE_LIMIT') {
+          // Force the counter so the buttons disappear immediately.
+          setRewritesUsed(REWRITE_CAP)
+        }
+        throw new Error(error ?? `HTTP ${r.status}`)
       }
       const { bullet, rewrites_used } = (await r.json()) as {
         bullet: string
@@ -104,8 +111,16 @@ export function BuilderPreview({
       </div>
 
       {errorMsg && (
-        <div className="mb-4 rounded-lg border border-clay/30 bg-clay/5 px-4 py-2 text-sm text-clay print:hidden">
-          {errorMsg}
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-clay/30 bg-clay/5 px-4 py-3 text-sm text-clay print:hidden">
+          <span className="flex-1">{errorMsg}</span>
+          <button
+            type="button"
+            onClick={() => setErrorMsg('')}
+            className="text-clay/70 hover:text-clay text-[12px]"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
         </div>
       )}
 
