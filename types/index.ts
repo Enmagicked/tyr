@@ -10,7 +10,7 @@ export type {
   LevelInferred,
 } from './resume'
 
-export type ParserName = 'affinda' | 'openresume' | 'naive'
+export type ParserName = 'affinda' | 'openresume' | 'naive' | 'llm'
 export type ModelName =
   | 'gpt-4o'
   | 'claude-sonnet-4-6'

@@ -111,7 +111,7 @@ export function ParserAgreementBars({ fieldDisagreement, nParsers }: ParserAgree
           Per-field agreement
         </div>
         <div className="text-[11px] text-driftwood">
-          {nParsers} of 2 parsers · longer green bar = better
+          {nParsers} of 3 parsers · longer green bar = better
         </div>
       </div>
       <svg

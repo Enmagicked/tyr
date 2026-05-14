@@ -3,6 +3,7 @@ import { loadResume } from './load-resume'
 // parseAffinda intentionally not imported — dropped from the runtime rotation
 // in M7 (see graph definition below for context + re-enable instructions).
 import { parseOpenResume, parseNaive, synthesizeParse } from './parsers'
+import { parseWithLlm } from './parse-llm'
 import {
   perceiveGPT4o,
   perceiveClaude,
@@ -54,6 +55,16 @@ export function buildAnalysisGraph(): GraphNode[] {
       fn: parseNaive,
       depends_on: ['load_resume'],
     },
+    // M9.5: Claude-Haiku-backed parser — high-quality canonical_data
+    // anchor. Captures projects + activities + awards (which the legacy
+    // parsers don't touch) and reliably extracts bullets so
+    // analyze_bullets has a source even when openresume fails on the
+    // user's layout.
+    {
+      name: 'parse_llm',
+      fn: parseWithLlm,
+      depends_on: ['load_resume'],
+    },
     // --- LLM perception (parallel) ---
     {
       name: 'perceive_gpt4o',
@@ -82,7 +93,7 @@ export function buildAnalysisGraph(): GraphNode[] {
       depends_on: ['load_resume'],
       // M7: parse_affinda removed — see comment above. Re-add here when the
       // Affinda response-shape mapping is fixed.
-      optional_deps: ['parse_openresume', 'parse_naive'],
+      optional_deps: ['parse_openresume', 'parse_naive', 'parse_llm'],
     },
     {
       name: 'perceive_resume',
