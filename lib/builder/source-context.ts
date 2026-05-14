@@ -7,6 +7,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { consensusList, consensusText, type PerceptionQueryRow } from '@/lib/agents/consensus'
 import type { CanonicalResume } from '@/types/resume'
 import type { BuilderInput } from './types'
+import { extractBuilderInputFromText } from './extract'
 
 export interface BuilderSourceContext {
   resume_id: string
@@ -31,7 +32,7 @@ export async function loadBuilderSourceContext(
   const { data: resume } = await service
     .from('resumes')
     .select(
-      'id, candidate_id, file_name, target_role, target_company, target_jd, is_internship'
+      'id, candidate_id, file_name, raw_text, target_role, target_company, target_jd, is_internship'
     )
     .eq('id', resumeId)
     .single()
@@ -46,17 +47,26 @@ export async function loadBuilderSourceContext(
   const topStrengths = queryRows.length > 0 ? consensusList(queryRows, 'top_strengths') : null
   const missingSignal = queryRows.length > 0 ? consensusText(queryRows, 'missing_signal') : null
 
-  // Pick the highest-scoring parser's canonical_data as the source of truth
-  // for prefill. Falls back gracefully when no parser succeeded.
-  const { data: parses } = await service
-    .from('parse_results')
-    .select('canonical_data, parse_score')
-    .eq('resume_id', resumeId)
-    .order('parse_score', { ascending: false, nullsFirst: false })
-    .limit(1)
-
-  const canonical = (parses && parses[0]?.canonical_data) as CanonicalResume | null | undefined
-  const prefilledInput = canonical ? canonicalToBuilderInput(canonical) : null
+  // Prefill the form by running the raw resume text through a Claude Haiku
+  // extraction pass. This captures EVERY section in the resume — including
+  // projects, activities, and awards which the canonical parsers don't
+  // touch — and works regardless of which parser succeeded. Falls back to
+  // canonical_data mapping if extraction fails (no key, LLM 5xx, etc.).
+  const rawText = (resume.raw_text as string | null) ?? ''
+  let prefilledInput: BuilderInput | null = null
+  if (rawText.trim().length >= 50) {
+    prefilledInput = await extractBuilderInputFromText(rawText)
+  }
+  if (!prefilledInput) {
+    const { data: parses } = await service
+      .from('parse_results')
+      .select('canonical_data, parse_score')
+      .eq('resume_id', resumeId)
+      .order('parse_score', { ascending: false, nullsFirst: false })
+      .limit(1)
+    const canonical = (parses && parses[0]?.canonical_data) as CanonicalResume | null | undefined
+    prefilledInput = canonical ? canonicalToBuilderInput(canonical) : null
+  }
 
   return {
     resume_id: resume.id as string,
