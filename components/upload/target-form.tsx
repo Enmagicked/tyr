@@ -55,7 +55,9 @@ export function TargetForm({ value, onChange, disabled }: TargetFormProps) {
 
       <div className="grid gap-4 md:grid-cols-2">
         <label htmlFor={roleId} className="flex flex-col gap-1.5">
-          <span className="text-xs text-driftwood">Role</span>
+          <span className="text-xs text-driftwood">
+            Role <span className="text-driftwood/60">(or type your own)</span>
+          </span>
           <input
             id={roleId}
             list={`${roleId}-list`}
@@ -64,7 +66,7 @@ export function TargetForm({ value, onChange, disabled }: TargetFormProps) {
             onChange={(e) =>
               onChange({ ...value, target_role: e.target.value })
             }
-            placeholder="Software Engineer"
+            placeholder="Software Engineer — or anything else"
             disabled={disabled}
             className="rounded-lg border border-bone bg-vellum/50 px-3 py-2.5 text-sm focus:outline-none focus:border-ink/40 focus:ring-2 focus:ring-thistle/20 disabled:opacity-50"
           />
@@ -73,6 +75,10 @@ export function TargetForm({ value, onChange, disabled }: TargetFormProps) {
               <option key={r} value={r} />
             ))}
           </datalist>
+          <span className="text-[11px] text-driftwood/70">
+            Suggestions are just shortcuts — type anything (e.g. &ldquo;Quant
+            Trader at a prop shop&rdquo;).
+          </span>
           {validation.errors.target_role && value.target_role.length > 0 && (
             <span className="text-xs text-clay">
               {validation.errors.target_role}
