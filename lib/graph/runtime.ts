@@ -60,6 +60,10 @@ export async function execute(
 
     if (error) {
       failed.add(name)
+      // Surface to Vercel logs / Sentry — without this, node-level throws
+      // (missing env vars, provider 4xx, etc.) only appear on the SSE
+      // stream to the client and vanish.
+      console.error(`[graph] node_failed ${name}: ${error.message}${error.stack ? ' | stack: ' + error.stack.split('\n').slice(0, 4).join(' | ') : ''}`)
       emit({
         type: 'node_failed',
         run_id: runId,
