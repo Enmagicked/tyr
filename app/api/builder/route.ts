@@ -145,7 +145,13 @@ async function handleBuilder(request: Request) {
     })
   if (storageError) {
     console.error('[builder] storage error:', storageError)
-    return NextResponse.json({ error: 'Failed to store generated resume' }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: 'Failed to store generated resume',
+        detail: storageError.message ?? String(storageError),
+      },
+      { status: 500 }
+    )
   }
 
   const { data: resume, error: dbError } = await service

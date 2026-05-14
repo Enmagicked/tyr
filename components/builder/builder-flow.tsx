@@ -106,11 +106,13 @@ export function BuilderFlow({ initialSourceContext = null }: BuilderFlowProps) {
         return
       }
       if (!r.ok) {
-        const { error, detail } = (await r.json().catch(() => ({}))) as {
+        const { error, detail, hint } = (await r.json().catch(() => ({}))) as {
           error?: string
           detail?: string
+          hint?: string
         }
-        throw new Error(detail ? `${error} — ${detail}` : (error ?? 'Builder failed'))
+        const tail = detail ?? hint
+        throw new Error(tail ? `${error} — ${tail}` : (error ?? 'Builder failed'))
       }
 
       const { resumeId } = (await r.json()) as { resumeId: string }
