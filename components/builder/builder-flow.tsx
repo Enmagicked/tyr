@@ -22,7 +22,9 @@ interface BuilderFlowProps {
 
 export function BuilderFlow({ initialSourceContext = null }: BuilderFlowProps) {
   const router = useRouter()
-  const [input, setInput] = useState<BuilderInput>(emptyBuilderInput())
+  const [input, setInput] = useState<BuilderInput>(
+    initialSourceContext?.prefilled_input ?? emptyBuilderInput()
+  )
   const [target, setTarget] = useState<TargetInput>({
     target_role: initialSourceContext?.target_role ?? '',
     target_company: initialSourceContext?.target_company ?? '',
@@ -181,9 +183,10 @@ export function BuilderFlow({ initialSourceContext = null }: BuilderFlowProps) {
             </p>
           )}
           <p className="text-[12px] text-driftwood/70 mt-3">
-            Your target role and JD have been pre-filled. Fill in the rest of
-            your activities below and the builder will weave the analyzer&apos;s
-            findings into the generated resume.
+            Your target metadata and the best-parsed fields from the scan
+            (contact, education, experiences, skills) have been pre-filled.
+            Edit or add anything else below, then build — the analyzer&apos;s
+            findings will be woven into the generated resume.
           </p>
         </div>
       )}

@@ -130,32 +130,42 @@ export default async function ReportPage({ params }: PageProps) {
       <LandingNav forceScrolledStyle />
       <div className="mx-auto max-w-5xl px-6 md:px-12 pt-32 pb-24">
         {/* Hero */}
-        <section className="mb-12">
+        <section className="mb-10">
           <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-driftwood mb-3">
             Your judgment
           </p>
           <h1 className="font-serif text-4xl md:text-5xl text-ink leading-[1.08] tracking-[-0.026em] mb-3">
             {resume.file_name}
           </h1>
-          <p className="text-sm text-driftwood mb-6">
+          <p className="text-sm text-driftwood">
             Analyzed {relativeAge(resume.created_at)}
             {resume.target_role && resume.target_company
               ? ` · target: ${resume.target_role} at ${resume.target_company}`
               : ''}
           </p>
+        </section>
+
+        {/* Rebuild CTA — sits between the title and the data, naturally
+            framing "here's the report; next step, fix it". */}
+        <section className="mb-12 rounded-2xl border border-bone bg-paper p-5 md:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex-1">
+            <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-marigold mb-1.5">
+              Next step
+            </p>
+            <p className="text-ink font-medium text-[15px] leading-snug mb-1">
+              Rebuild this resume with the findings below baked in.
+            </p>
+            <p className="text-[13px] text-driftwood/90 leading-relaxed">
+              The builder uses your activities + the gaps and strengths the
+              4 AIs found here, so the rewrite addresses them directly.
+            </p>
+          </div>
           <a
             href={`/builder?from=${resumeId}`}
-            className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-medium text-vellum hover:bg-ink/90 transition-colors shadow-[0_4px_20px_rgba(15,24,48,.18)]"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-2.5 text-[13px] font-medium text-vellum hover:bg-ink/90 transition-colors whitespace-nowrap shrink-0"
           >
-            <span>🔁</span>
-            <span>Rebuild this resume using these findings</span>
-            <span className="text-vellum/70">→</span>
+            Rebuild →
           </a>
-          <p className="mt-2 text-[12px] text-driftwood/70">
-            Takes you to the builder with your target role + the AI&apos;s
-            specific findings (gap to avoid, strengths to lean into) already
-            wired into generation.
-          </p>
         </section>
 
         {/* Headline scores */}

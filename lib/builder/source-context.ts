@@ -5,6 +5,8 @@
 
 import { createServiceClient } from '@/lib/supabase/service'
 import { consensusList, consensusText, type PerceptionQueryRow } from '@/lib/agents/consensus'
+import type { CanonicalResume } from '@/types/resume'
+import type { BuilderInput } from './types'
 
 export interface BuilderSourceContext {
   resume_id: string
@@ -15,6 +17,9 @@ export interface BuilderSourceContext {
   is_internship: boolean
   top_strengths: string[] | null
   missing_signal: string | null
+  // M9.5: when present, BuilderFlow uses this as initial form state so the
+  // user iterates from their existing resume rather than re-typing it.
+  prefilled_input: BuilderInput | null
 }
 
 export async function loadBuilderSourceContext(
@@ -41,6 +46,18 @@ export async function loadBuilderSourceContext(
   const topStrengths = queryRows.length > 0 ? consensusList(queryRows, 'top_strengths') : null
   const missingSignal = queryRows.length > 0 ? consensusText(queryRows, 'missing_signal') : null
 
+  // Pick the highest-scoring parser's canonical_data as the source of truth
+  // for prefill. Falls back gracefully when no parser succeeded.
+  const { data: parses } = await service
+    .from('parse_results')
+    .select('canonical_data, parse_score')
+    .eq('resume_id', resumeId)
+    .order('parse_score', { ascending: false, nullsFirst: false })
+    .limit(1)
+
+  const canonical = (parses && parses[0]?.canonical_data) as CanonicalResume | null | undefined
+  const prefilledInput = canonical ? canonicalToBuilderInput(canonical) : null
+
   return {
     resume_id: resume.id as string,
     file_name: (resume.file_name as string | null) ?? null,
@@ -50,6 +67,61 @@ export async function loadBuilderSourceContext(
     is_internship: !!resume.is_internship,
     top_strengths: topStrengths,
     missing_signal: missingSignal,
+    prefilled_input: prefilledInput,
+  }
+}
+
+// CanonicalResume → BuilderInput mapping for the rebuild flow.
+// Preserves user-facing raw values (school_raw, employer_raw, title_raw)
+// over the canonicalized ids — those are for the disagreement scorer.
+function canonicalToBuilderInput(canon: CanonicalResume): BuilderInput {
+  const fmtDate = (iso?: string): string => {
+    if (!iso) return ''
+    // ISO is YYYY-MM; render YYYY-MM as-is — short, unambiguous.
+    return iso
+  }
+  const fmtRange = (start?: string, end?: string): string => {
+    if (start && end) return `${start} — ${end}`
+    if (start) return `${start} — present`
+    if (end) return end
+    return ''
+  }
+  const links = [
+    canon.contact.linkedin_url,
+    canon.contact.github_url,
+    ...(canon.contact.personal_urls ?? []),
+  ]
+    .filter((s): s is string => !!s)
+    .join(' · ')
+
+  return {
+    contact: {
+      name: canon.name ?? '',
+      email: canon.contact.email ?? '',
+      phone: canon.contact.phone ?? '',
+      location: '',
+      links,
+    },
+    education: canon.education.map((e) => ({
+      school: e.school_raw ?? '',
+      degree: e.degree_normalized ?? '',
+      field: e.field ?? '',
+      graduation: fmtDate(e.end_iso),
+      gpa: e.gpa !== undefined ? String(e.gpa) : '',
+      coursework: '',
+      honors: '',
+    })),
+    experiences: canon.experience.map((e) => ({
+      role: e.title_raw ?? '',
+      org: e.employer_raw ?? '',
+      dates: fmtRange(e.start_iso, e.end_iso),
+      location: '',
+      description: e.bullets.join('\n'),
+    })),
+    projects: [],
+    activities: [],
+    skills: canon.skills.map((s) => s.name_canonical).join(', '),
+    awards: '',
   }
 }
 
