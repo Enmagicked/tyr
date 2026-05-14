@@ -147,6 +147,11 @@ async function handleUpload(request: Request) {
     throw err
   }
 
+  // Postgres text columns reject NUL bytes (error 22P05). PDFs occasionally
+  // surface raw NULs in extracted text — strip them at the boundary before
+  // any DB write.
+  ingest.raw_text = stripNulls(ingest.raw_text)
+
   if (!ingest.raw_text || ingest.raw_text.trim().length < MIN_RAW_TEXT_CHARS) {
     return NextResponse.json(
       {
@@ -182,9 +187,9 @@ async function handleUpload(request: Request) {
       file_path: filePath,
       file_name: ingest.file_name,
       raw_text: ingest.raw_text,
-      target_role: targetRole,
-      target_company: targetCompany,
-      target_jd: targetJd || null,
+      target_role: stripNulls(targetRole),
+      target_company: stripNulls(targetCompany),
+      target_jd: targetJd ? stripNulls(targetJd) : null,
       input_kind: inputKind,
       is_priority: isPriority,
       is_internship: isInternship,
@@ -242,6 +247,12 @@ async function handleUpload(request: Request) {
 // Per-kind ingest helpers. Each throws IngestError with a JSON-shaped detail
 // when input is rejected; callers catch and forward as the response body.
 // ---------------------------------------------------------------------------
+
+// Postgres text columns reject NUL bytes (error 22P05). Strip on the way
+// into the DB so funky PDFs / OCR output don't 500 the upload.
+function stripNulls(s: string): string {
+  return s.replace(/\0/g, '')
+}
 
 class IngestError extends Error {
   statusCode: number
