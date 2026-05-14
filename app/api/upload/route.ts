@@ -194,7 +194,17 @@ async function handleUpload(request: Request) {
 
   if (dbError || !resume) {
     console.error('[upload] db error:', dbError)
-    return NextResponse.json({ error: 'Failed to save resume' }, { status: 500 })
+    const message = dbError?.message ?? 'unknown'
+    const details = dbError?.details ?? ''
+    const hint = dbError?.hint ?? ''
+    const code = dbError?.code ?? ''
+    return NextResponse.json(
+      {
+        error: 'Failed to save resume',
+        detail: [code, message, details, hint].filter(Boolean).join(' · '),
+      },
+      { status: 500 }
+    )
   }
 
   // Decrement the credit that was checked above (admins bypass).
