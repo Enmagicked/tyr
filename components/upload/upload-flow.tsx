@@ -119,8 +119,9 @@ export function UploadFlow() {
         return
       }
       if (!uploadRes.ok) {
-        const { error, hint } = await uploadRes.json()
-        throw new Error(hint ? `${error} — ${hint}` : (error ?? 'Upload failed'))
+        const { error, hint, detail } = await uploadRes.json()
+        const tail = detail ?? hint
+        throw new Error(tail ? `${error} — ${tail}` : (error ?? 'Upload failed'))
       }
       const { resumeId } = await uploadRes.json()
 
