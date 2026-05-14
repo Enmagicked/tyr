@@ -14,6 +14,7 @@ import { generateResume } from '@/lib/builder/generate'
 import { renderResumeText } from '@/lib/builder/render'
 import type { BuilderInput } from '@/lib/builder/types'
 import { isAdminEmail } from '@/lib/admin'
+import { loadBuilderSourceContext, buildInsightsAddendum } from '@/lib/builder/source-context'
 
 export async function POST(request: Request) {
   try {
@@ -34,6 +35,10 @@ interface BuilderRequestBody {
   target_company?: string
   target_jd?: string
   is_internship?: boolean
+  // M9.5: when the user clicks "Rebuild" from a report page, this carries
+  // the source resume's id so generation can be conditioned on the
+  // analyzer's findings (missing_signal + top_strengths consensus).
+  source_resume_id?: string
 }
 
 async function handleBuilder(request: Request) {
@@ -105,14 +110,24 @@ async function handleBuilder(request: Request) {
   }
   const isInternship = !!body.is_internship
 
+  // Optional: condition generation on insights from a prior resume scan.
+  let insightsAddendum = ''
+  if (body.source_resume_id) {
+    const source = await loadBuilderSourceContext(body.source_resume_id, user.id)
+    insightsAddendum = buildInsightsAddendum(source)
+  }
+
   // Generate via Claude
-  const generated = await generateResume({
-    input: body.input,
-    targetRole,
-    targetCompany: targetCompany || null,
-    targetJd: targetJd || null,
-    isInternship,
-  })
+  const generated = await generateResume(
+    {
+      input: body.input,
+      targetRole,
+      targetCompany: targetCompany || null,
+      targetJd: targetJd || null,
+      isInternship,
+    },
+    insightsAddendum
+  )
 
   const rawText = renderResumeText(generated)
 

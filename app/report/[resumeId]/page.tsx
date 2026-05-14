@@ -137,11 +137,24 @@ export default async function ReportPage({ params }: PageProps) {
           <h1 className="font-serif text-4xl md:text-5xl text-ink leading-[1.08] tracking-[-0.026em] mb-3">
             {resume.file_name}
           </h1>
-          <p className="text-sm text-driftwood">
+          <p className="text-sm text-driftwood mb-6">
             Analyzed {relativeAge(resume.created_at)}
             {resume.target_role && resume.target_company
               ? ` · target: ${resume.target_role} at ${resume.target_company}`
               : ''}
+          </p>
+          <a
+            href={`/builder?from=${resumeId}`}
+            className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-medium text-vellum hover:bg-ink/90 transition-colors shadow-[0_4px_20px_rgba(15,24,48,.18)]"
+          >
+            <span>🔁</span>
+            <span>Rebuild this resume using these findings</span>
+            <span className="text-vellum/70">→</span>
+          </a>
+          <p className="mt-2 text-[12px] text-driftwood/70">
+            Takes you to the builder with your target role + the AI&apos;s
+            specific findings (gap to avoid, strengths to lean into) already
+            wired into generation.
           </p>
         </section>
 

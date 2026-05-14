@@ -69,12 +69,19 @@ function validate(parsed: unknown): GeneratedResume | null {
   }
 }
 
-export async function generateResume(args: BuildGenPromptArgs): Promise<GeneratedResume> {
-  const key = generationCacheKey(args)
+export async function generateResume(
+  args: BuildGenPromptArgs,
+  insightsAddendum = ''
+): Promise<GeneratedResume> {
+  // Insights addendum is part of the cache key so rebuilds from different
+  // source resumes (or no source) produce distinct cache entries.
+  const key = generationCacheKey(args) + (insightsAddendum
+    ? `:${createHash('sha256').update(insightsAddendum).digest('hex').slice(0, 12)}`
+    : '')
   const cached = await cacheGet<GeneratedResume>(key)
   if (cached) return cached
 
-  const prompt = buildGenerationPrompt(args)
+  const prompt = buildGenerationPrompt(args) + insightsAddendum
   const r = await getClient().messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 3000,

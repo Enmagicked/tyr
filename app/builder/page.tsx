@@ -1,12 +1,31 @@
+import { redirect } from 'next/navigation'
 import { LandingNav } from '@/components/landing/nav'
 import { BuilderFlow } from '@/components/builder/builder-flow'
 import { CreditsAddedBanner } from '@/components/upload/credits-added-banner'
+import { createClient } from '@/lib/supabase/server'
+import { loadBuilderSourceContext, type BuilderSourceContext } from '@/lib/builder/source-context'
 
 export const metadata = {
   title: 'Builder — tyr',
 }
 
-export default function BuilderPage() {
+interface PageProps {
+  searchParams: Promise<{ from?: string }>
+}
+
+export default async function BuilderPage({ searchParams }: PageProps) {
+  const { from } = await searchParams
+
+  let sourceContext: BuilderSourceContext | null = null
+  if (from) {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) redirect(`/login?next=${encodeURIComponent(`/builder?from=${from}`)}`)
+    sourceContext = await loadBuilderSourceContext(from, user.id)
+  }
+
   return (
     <main className="min-h-screen bg-vellum">
       <LandingNav forceScrolledStyle />
@@ -40,7 +59,7 @@ export default function BuilderPage() {
           </div>
         </div>
         <CreditsAddedBanner />
-        <BuilderFlow />
+        <BuilderFlow initialSourceContext={sourceContext} />
       </div>
     </main>
   )

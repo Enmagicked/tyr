@@ -7,6 +7,7 @@ import { BuilderForm, emptyBuilderInput } from './builder-form'
 import { TargetForm } from '@/components/upload/target-form'
 import { isValidTarget, type TargetInput } from '@/components/upload/target-validation'
 import type { BuilderInput } from '@/lib/builder/types'
+import type { BuilderSourceContext } from '@/lib/builder/source-context'
 
 type Step = 'idle' | 'generating' | 'analyzing' | 'paywalled' | 'builder_locked' | 'error'
 
@@ -15,14 +16,18 @@ interface GraphEvent {
   node?: string
 }
 
-export function BuilderFlow() {
+interface BuilderFlowProps {
+  initialSourceContext?: BuilderSourceContext | null
+}
+
+export function BuilderFlow({ initialSourceContext = null }: BuilderFlowProps) {
   const router = useRouter()
   const [input, setInput] = useState<BuilderInput>(emptyBuilderInput())
   const [target, setTarget] = useState<TargetInput>({
-    target_role: '',
-    target_company: '',
-    target_jd: '',
-    is_internship: false,
+    target_role: initialSourceContext?.target_role ?? '',
+    target_company: initialSourceContext?.target_company ?? '',
+    target_jd: initialSourceContext?.target_jd ?? '',
+    is_internship: initialSourceContext?.is_internship ?? false,
   })
   const [step, setStep] = useState<Step>('idle')
   const [errorMsg, setErrorMsg] = useState('')
@@ -89,6 +94,7 @@ export function BuilderFlow() {
           target_company: target.target_company.trim(),
           target_jd: target.target_jd.trim(),
           is_internship: target.is_internship,
+          source_resume_id: initialSourceContext?.resume_id,
         }),
       })
 
@@ -151,6 +157,37 @@ export function BuilderFlow() {
 
   return (
     <div className="space-y-8">
+      {initialSourceContext && (
+        <div className="rounded-2xl border border-marigold/30 bg-marigold/5 p-5 md:p-6">
+          <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-driftwood mb-2">
+            Rebuilding from your scan
+          </p>
+          <p className="text-sm text-ink mb-2">
+            Source:{' '}
+            <span className="font-medium">
+              {initialSourceContext.file_name ?? 'previous resume'}
+            </span>
+          </p>
+          {initialSourceContext.missing_signal && (
+            <p className="text-[13px] text-driftwood leading-relaxed">
+              <span className="text-ink font-medium">Gap the AI will avoid:</span>{' '}
+              {initialSourceContext.missing_signal}
+            </p>
+          )}
+          {initialSourceContext.top_strengths && initialSourceContext.top_strengths.length > 0 && (
+            <p className="text-[13px] text-driftwood leading-relaxed mt-1.5">
+              <span className="text-ink font-medium">Strengths to lean into:</span>{' '}
+              {initialSourceContext.top_strengths.slice(0, 3).join(' · ')}
+            </p>
+          )}
+          <p className="text-[12px] text-driftwood/70 mt-3">
+            Your target role and JD have been pre-filled. Fill in the rest of
+            your activities below and the builder will weave the analyzer&apos;s
+            findings into the generated resume.
+          </p>
+        </div>
+      )}
+
       <TargetForm value={target} onChange={setTarget} disabled={isActive} />
 
       <BuilderForm value={input} onChange={setInput} disabled={isActive} />

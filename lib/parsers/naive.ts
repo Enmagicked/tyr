@@ -1,9 +1,32 @@
-import type { ParseResult, ParsedResume, ParseIssue } from '@/types'
+import type { ParseResult, ParsedResume, ParseIssue, Education } from '@/types'
 import { normalize } from './normalize'
+import seedSchools from './seed-schools.json' with { type: 'json' }
 
 // Simulates how a basic/cheap ATS works: global regex searches, no structure awareness.
 // No section detection. Skills matched against a fixed keyword list.
 // Intentionally limited — the divergence from Affinda and OpenResume is the insight.
+
+interface SeedSchool {
+  canonical_id: string
+  display_name: string
+  aliases: string[]
+}
+
+// Flattened "alias → canonical display name" map for fast scanning.
+// Done once at module load. The seed list is ~60 entries — keep it conservative
+// so the naive parser doesn't false-positive on coincidental substrings.
+const SCHOOL_ALIASES: Array<{ alias: string; display: string }> = (() => {
+  const out: Array<{ alias: string; display: string }> = []
+  for (const s of (seedSchools as { entries: SeedSchool[] }).entries) {
+    for (const a of s.aliases) {
+      // Require at least 3 chars to skip "mit" matching in random words.
+      if (a.length >= 3) out.push({ alias: a.toLowerCase(), display: s.display_name })
+    }
+  }
+  // Longer aliases first so "harvard university" beats "harvard" on the same line.
+  out.sort((a, b) => b.alias.length - a.alias.length)
+  return out
+})()
 
 const KNOWN_SKILLS = [
   'Python', 'JavaScript', 'TypeScript', 'Java', 'C++', 'C#', 'Go', 'Rust', 'Ruby', 'PHP',
@@ -46,6 +69,22 @@ export function parseWithNaive(rawText: string): ParseResult {
     new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(rawText)
   )
 
+  // M9.5: scan for known school names from seed-schools.json. Previously
+  // naive returned education: [] always, which made the parser-agreement
+  // chart read "0% agreement on Education" on every resume — misleading
+  // because the asymmetry was naive-not-trying, not parsers-disagreeing.
+  // Conservative match: word-boundary regex against seed aliases ≥ 3 chars.
+  const lowerText = rawText.toLowerCase()
+  const seenSchools = new Set<string>()
+  const foundEducation: Education[] = []
+  for (const { alias, display } of SCHOOL_ALIASES) {
+    if (seenSchools.has(display)) continue
+    if (new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(lowerText)) {
+      seenSchools.add(display)
+      foundEducation.push({ institution: display })
+    }
+  }
+
   const structured: ParsedResume = {
     name: firstLine?.trim(),
     email: emailMatch?.[0],
@@ -53,7 +92,7 @@ export function parseWithNaive(rawText: string): ParseResult {
     linkedin: linkedinMatch ? `linkedin.com/in/${linkedinMatch[1]}` : undefined,
     skills: foundSkills,
     experience: [],
-    education: [],
+    education: foundEducation,
     certifications: [],
     languages: [],
   }
