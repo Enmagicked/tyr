@@ -66,6 +66,9 @@
 - **Insights-conditioned generation:** `/api/builder` POST loads `missing_signal` + `top_strengths` consensus from source resume (no Haiku call) and appends to the prompt at call time. Not part of `lib/builder/prompts.lock.json` — it's a runtime addendum so the lockfile invariant stays intact
 - **Migration 0010** applied to prod: extends `input_kind` CHECK to include `'builder'`, adds `is_internship` + `builder_input` jsonb + `builder_rewrites_used` int
 
+### Next session: user wants to focus on UI polish
+M9.5 functionality is done and working end-to-end. The user's stated next focus is **UI / visual polish** — not new features, not bugs (unless one surfaces). Treat next session as a design pass: typography, spacing, copy, layout consistency, animation, mobile responsiveness, the report page's data density, the builder preview's print fidelity, etc. Wait for the user to point at specific surfaces rather than refactoring proactively.
+
 ### What to investigate next session (if user reports prefill still empty)
 1. Check Vercel logs for `[builder.extract]` lines — they explicitly say which stage failed (empty response / parse / validate / abort)
 2. If Haiku consistently returns shallow JSON, options are:
