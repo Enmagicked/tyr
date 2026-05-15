@@ -22,9 +22,12 @@ function getClient(): Anthropic | null {
   return _client
 }
 
-// v2: switched extractor to Sonnet 4.6 — Haiku-cached empty results need
-// to be invalidated so existing resumes get re-extracted on rebuild.
-const CACHE_NAMESPACE = 'builder_extract:v2'
+// v3: back to Haiku 4.5 (dated slug). User prefers the latency tradeoff
+// even if extraction coverage is less complete than Sonnet — the prefill
+// is meant to be a head-start, not a perfect fill, and Sonnet was
+// timing out on cold starts. Cache namespace bump so v2 Sonnet results
+// don't get served when Haiku would produce something different.
+const CACHE_NAMESPACE = 'builder_extract:v3'
 
 const EXTRACT_PROMPT = `Read the resume text below (delimited by <resume_text>) and emit a JSON object capturing every section the candidate included. Use ONLY information that is actually present — do not invent metrics, dates, employers, schools, or technologies.
 
@@ -175,13 +178,10 @@ export async function extractBuilderInputFromText(
   try {
     const r = await client.messages.create(
       {
-        // Sonnet is more reliable than Haiku for deeply-nested JSON
-        // schemas. User reported Haiku was returning only the skills
-        // field while ignoring contact/education/experiences/etc.
-        // Sonnet costs more (~$0.01/call vs $0.002) but it's a one-shot
-        // call per rebuild and the form correctness matters more than
-        // a few cents.
-        model: 'claude-sonnet-4-6',
+        // Haiku 4.5 dated slug (the bare 'claude-haiku-4-5' alias 404s).
+        // Faster than Sonnet at the cost of less complete extraction on
+        // some resumes — user explicitly preferred this tradeoff.
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 4000,
         temperature: 0,
         messages: [

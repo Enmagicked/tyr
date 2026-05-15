@@ -226,23 +226,36 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
             </p>
           </div>
           {prefilling ? (
-            <>
-              <p className="text-sm text-ink font-medium mb-1.5">
-                Reading your previous resume + the analyzer&apos;s findings
+            <div className="text-center py-4">
+              <div className="inline-flex items-center justify-center gap-3 mb-4">
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-5 w-5 rounded-full border-2 border-marigold/30 border-t-marigold animate-spin"
+                />
+                <p className="font-serif text-xl md:text-2xl text-ink">
+                  Reading your resume…
+                </p>
+              </div>
+              <p className="text-[14px] text-driftwood leading-relaxed max-w-md mx-auto mb-3">
+                Claude is extracting every section of your PDF — contact,
+                education, experiences, projects, activities, skills,
+                awards — so you don&apos;t have to retype any of it.
               </p>
-              <p className="text-[13px] text-driftwood/90 leading-relaxed mb-3">
-                A Claude pass is extracting every section of your PDF —
-                contact, education, experiences, projects, activities,
-                skills, awards — so you don&apos;t have to retype any of it.
-                Usually takes 5-15 seconds.
+              <p className="text-[13px] text-marigold font-medium">
+                ⏱ This can take up to a minute on a cold start — please don&apos;t
+                refresh.
               </p>
-              <div className="flex flex-col gap-1 text-[12px] text-driftwood/80">
+              <div className="mt-5 flex flex-col gap-1.5 text-[12px] text-driftwood/80 max-w-xs mx-auto">
                 <div className="flex items-center gap-2">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-marigold animate-pulse" />
-                  Extracting structured fields…
+                  Calling Claude on the resume text…
+                </div>
+                <div className="flex items-center gap-2 opacity-60">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-driftwood/40" />
+                  Mapping into your form fields…
                 </div>
               </div>
-            </>
+            </div>
           ) : sourceContext ? (
             <>
               <p className="text-sm text-ink mb-2">
