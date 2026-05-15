@@ -22,7 +22,9 @@ function getClient(): Anthropic | null {
   return _client
 }
 
-const CACHE_NAMESPACE = 'builder_extract:v1'
+// v2: switched extractor to Sonnet 4.6 — Haiku-cached empty results need
+// to be invalidated so existing resumes get re-extracted on rebuild.
+const CACHE_NAMESPACE = 'builder_extract:v2'
 
 const EXTRACT_PROMPT = `Read the resume text below (delimited by <resume_text>) and emit a JSON object capturing every section the candidate included. Use ONLY information that is actually present — do not invent metrics, dates, employers, schools, or technologies.
 
@@ -173,11 +175,14 @@ export async function extractBuilderInputFromText(
   try {
     const r = await client.messages.create(
       {
-        // Haiku doesn't have a bare-alias model ID like Sonnet/Opus — must
-        // use the dated slug or the API returns 404 and we silently fall
-        // through to a null result (= empty form fields).
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 3000,
+        // Sonnet is more reliable than Haiku for deeply-nested JSON
+        // schemas. User reported Haiku was returning only the skills
+        // field while ignoring contact/education/experiences/etc.
+        // Sonnet costs more (~$0.01/call vs $0.002) but it's a one-shot
+        // call per rebuild and the form correctness matters more than
+        // a few cents.
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4000,
         temperature: 0,
         messages: [
           {
@@ -189,9 +194,23 @@ export async function extractBuilderInputFromText(
       { signal: controller.signal }
     )
     const responseText = r.content[0]?.type === 'text' ? r.content[0].text : ''
+    if (!responseText) {
+      console.warn('[builder.extract] empty response from model')
+      return null
+    }
     const parsed = repairAndParseJson(responseText)
+    if (!parsed) {
+      console.warn(`[builder.extract] JSON parse failed; first 200 chars: ${responseText.slice(0, 200)}`)
+      return null
+    }
+    const topKeys = Object.keys(parsed).join(',')
     const validated = validate(parsed)
-    if (!validated) return null
+    if (!validated) {
+      console.warn(`[builder.extract] validate() rejected; top keys: ${topKeys}`)
+      return null
+    }
+    const summary = `name=${validated.contact.name ? 'Y' : 'N'} edu=${validated.education.length} exp=${validated.experiences.length} proj=${validated.projects.length} act=${validated.activities.length} skills=${validated.skills ? 'Y' : 'N'} awards=${validated.awards ? 'Y' : 'N'}`
+    console.log(`[builder.extract] success: ${summary}`)
     await cacheSet(key, validated)
     return validated
   } catch (err) {
