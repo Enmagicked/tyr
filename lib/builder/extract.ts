@@ -173,7 +173,10 @@ export async function extractBuilderInputFromText(
   try {
     const r = await client.messages.create(
       {
-        model: 'claude-haiku-4-5',
+        // Haiku doesn't have a bare-alias model ID like Sonnet/Opus — must
+        // use the dated slug or the API returns 404 and we silently fall
+        // through to a null result (= empty form fields).
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 3000,
         temperature: 0,
         messages: [
