@@ -206,14 +206,43 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
   return (
     <div className="space-y-8">
       {sourceResumeId && (
-        <div className="rounded-2xl border border-marigold/30 bg-marigold/5 p-5 md:p-6">
-          <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-driftwood mb-2">
-            Rebuilding from your scan
-          </p>
-          {prefilling ? (
-            <p className="text-sm text-driftwood italic">
-              Reading your previous resume + the analyzer&apos;s findings…
+        <div
+          className={[
+            'rounded-2xl border p-5 md:p-6 transition-colors',
+            prefilling
+              ? 'border-marigold/50 bg-marigold/10'
+              : 'border-marigold/30 bg-marigold/5',
+          ].join(' ')}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            {prefilling && (
+              <span
+                aria-hidden="true"
+                className="inline-block h-3 w-3 rounded-full border-2 border-marigold/40 border-t-marigold animate-spin"
+              />
+            )}
+            <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-driftwood">
+              {prefilling ? 'Rebuilding from your scan…' : 'Rebuilding from your scan'}
             </p>
+          </div>
+          {prefilling ? (
+            <>
+              <p className="text-sm text-ink font-medium mb-1.5">
+                Reading your previous resume + the analyzer&apos;s findings
+              </p>
+              <p className="text-[13px] text-driftwood/90 leading-relaxed mb-3">
+                A Claude pass is extracting every section of your PDF —
+                contact, education, experiences, projects, activities,
+                skills, awards — so you don&apos;t have to retype any of it.
+                Usually takes 5-15 seconds.
+              </p>
+              <div className="flex flex-col gap-1 text-[12px] text-driftwood/80">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-marigold animate-pulse" />
+                  Extracting structured fields…
+                </div>
+              </div>
+            </>
           ) : sourceContext ? (
             <>
               <p className="text-sm text-ink mb-2">
