@@ -163,18 +163,28 @@ export async function extractBuilderInputFromText(
   const cached = await cacheGet<BuilderInput>(key)
   if (cached) return cached
 
+  // Hard timeout so a stuck call falls back to the canonical mapping
+  // instead of starving the route's maxDuration budget. 25s leaves room
+  // for the rest of the prefill handler to respond inside Vercel's 60s
+  // route ceiling.
+  const controller = new AbortController()
+  const timeoutMs = 25_000
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const r = await client.messages.create({
-      model: 'claude-haiku-4-5',
-      max_tokens: 4000,
-      temperature: 0,
-      messages: [
-        {
-          role: 'user',
-          content: `${EXTRACT_PROMPT}\n\n<resume_text>\n${text}\n</resume_text>`,
-        },
-      ],
-    })
+    const r = await client.messages.create(
+      {
+        model: 'claude-haiku-4-5',
+        max_tokens: 3000,
+        temperature: 0,
+        messages: [
+          {
+            role: 'user',
+            content: `${EXTRACT_PROMPT}\n\n<resume_text>\n${text}\n</resume_text>`,
+          },
+        ],
+      },
+      { signal: controller.signal }
+    )
     const responseText = r.content[0]?.type === 'text' ? r.content[0].text : ''
     const parsed = repairAndParseJson(responseText)
     const validated = validate(parsed)
@@ -184,5 +194,7 @@ export async function extractBuilderInputFromText(
   } catch (err) {
     console.warn('[builder.extract] failed:', err instanceof Error ? err.message : err)
     return null
+  } finally {
+    clearTimeout(timer)
   }
 }

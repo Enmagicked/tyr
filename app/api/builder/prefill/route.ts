@@ -7,8 +7,10 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { loadBuilderSourceContext } from '@/lib/builder/source-context'
 
-// Haiku extraction can run 1-3s; allow headroom for cold starts.
-export const maxDuration = 30
+// Haiku extraction usually 1-3s, but cold starts + Anthropic queueing
+// can spike to 20s+. Headroom for both, with an internal Haiku timeout
+// that falls back to the canonical-data mapping if it goes too long.
+export const maxDuration = 60
 
 export async function GET(request: Request) {
   try {
