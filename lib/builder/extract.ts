@@ -166,11 +166,11 @@ export async function extractBuilderInputFromText(
   if (cached) return cached
 
   // Hard timeout so a stuck call falls back to the canonical mapping
-  // instead of starving the route's maxDuration budget. 25s leaves room
-  // for the rest of the prefill handler to respond inside Vercel's 60s
-  // route ceiling.
+  // instead of starving the route's maxDuration budget. Sonnet on long
+  // resumes can take 30-40s; 25s was too aggressive (user hit abort
+  // every time). 50s leaves headroom under the route's 60s ceiling.
   const controller = new AbortController()
-  const timeoutMs = 25_000
+  const timeoutMs = 50_000
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const r = await client.messages.create(
