@@ -33,6 +33,7 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
   })
   const [sourceContext, setSourceContext] = useState<BuilderSourceContext | null>(null)
   const [prefilling, setPrefilling] = useState<boolean>(!!sourceResumeId)
+  const [prefillError, setPrefillError] = useState<string | null>(null)
 
   // Client-side prefill: when ?from=<resumeId> is set, hit the prefill
   // endpoint which runs the Haiku extraction and returns the structured
@@ -44,7 +45,10 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
     setPrefilling(true)
     fetch(`/api/builder/prefill?resumeId=${encodeURIComponent(sourceResumeId)}`)
       .then(async (r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        if (!r.ok) {
+          const body = (await r.json().catch(() => ({}))) as { error?: string; detail?: string }
+          throw new Error(body.detail ?? body.error ?? `HTTP ${r.status}`)
+        }
         return (await r.json()) as BuilderSourceContext
       })
       .then((ctx) => {
@@ -59,7 +63,10 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
         })
       })
       .catch((err) => {
-        console.warn('[builder] prefill failed:', err)
+        if (cancelled) return
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn('[builder] prefill failed:', msg)
+        setPrefillError(msg)
       })
       .finally(() => {
         if (!cancelled) setPrefilling(false)
@@ -235,7 +242,8 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
             </>
           ) : (
             <p className="text-[13px] text-clay">
-              Couldn&apos;t load the prefill. You can still build manually below.
+              Couldn&apos;t load the prefill{prefillError ? ` — ${prefillError}` : ''}.
+              You can still build manually below.
             </p>
           )}
         </div>
