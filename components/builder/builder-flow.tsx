@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import posthog from 'posthog-js'
 import { BuilderForm, emptyBuilderInput } from './builder-form'
@@ -17,20 +17,57 @@ interface GraphEvent {
 }
 
 interface BuilderFlowProps {
-  initialSourceContext?: BuilderSourceContext | null
+  // Pass-through from the page's ?from=X searchParam. If set, BuilderFlow
+  // fetches /api/builder/prefill on mount and populates input + target.
+  sourceResumeId?: string | null
 }
 
-export function BuilderFlow({ initialSourceContext = null }: BuilderFlowProps) {
+export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
   const router = useRouter()
-  const [input, setInput] = useState<BuilderInput>(
-    initialSourceContext?.prefilled_input ?? emptyBuilderInput()
-  )
+  const [input, setInput] = useState<BuilderInput>(emptyBuilderInput())
   const [target, setTarget] = useState<TargetInput>({
-    target_role: initialSourceContext?.target_role ?? '',
-    target_company: initialSourceContext?.target_company ?? '',
-    target_jd: initialSourceContext?.target_jd ?? '',
-    is_internship: initialSourceContext?.is_internship ?? false,
+    target_role: '',
+    target_company: '',
+    target_jd: '',
+    is_internship: false,
   })
+  const [sourceContext, setSourceContext] = useState<BuilderSourceContext | null>(null)
+  const [prefilling, setPrefilling] = useState<boolean>(!!sourceResumeId)
+
+  // Client-side prefill: when ?from=<resumeId> is set, hit the prefill
+  // endpoint which runs the Haiku extraction and returns the structured
+  // BuilderInput + analyzer-findings consensus. Server-side blocking
+  // version made the page take 5-10s to TTFB.
+  useEffect(() => {
+    if (!sourceResumeId) return
+    let cancelled = false
+    setPrefilling(true)
+    fetch(`/api/builder/prefill?resumeId=${encodeURIComponent(sourceResumeId)}`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return (await r.json()) as BuilderSourceContext
+      })
+      .then((ctx) => {
+        if (cancelled) return
+        setSourceContext(ctx)
+        if (ctx.prefilled_input) setInput(ctx.prefilled_input)
+        setTarget({
+          target_role: ctx.target_role ?? '',
+          target_company: ctx.target_company ?? '',
+          target_jd: ctx.target_jd ?? '',
+          is_internship: ctx.is_internship ?? false,
+        })
+      })
+      .catch((err) => {
+        console.warn('[builder] prefill failed:', err)
+      })
+      .finally(() => {
+        if (!cancelled) setPrefilling(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [sourceResumeId])
   const [step, setStep] = useState<Step>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [currentNode, setCurrentNode] = useState<string | null>(null)
@@ -96,7 +133,7 @@ export function BuilderFlow({ initialSourceContext = null }: BuilderFlowProps) {
           target_company: target.target_company.trim(),
           target_jd: target.target_jd.trim(),
           is_internship: target.is_internship,
-          source_resume_id: initialSourceContext?.resume_id,
+          source_resume_id: sourceResumeId ?? undefined,
         }),
       })
 
@@ -161,35 +198,46 @@ export function BuilderFlow({ initialSourceContext = null }: BuilderFlowProps) {
 
   return (
     <div className="space-y-8">
-      {initialSourceContext && (
+      {sourceResumeId && (
         <div className="rounded-2xl border border-marigold/30 bg-marigold/5 p-5 md:p-6">
           <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-driftwood mb-2">
             Rebuilding from your scan
           </p>
-          <p className="text-sm text-ink mb-2">
-            Source:{' '}
-            <span className="font-medium">
-              {initialSourceContext.file_name ?? 'previous resume'}
-            </span>
-          </p>
-          {initialSourceContext.missing_signal && (
-            <p className="text-[13px] text-driftwood leading-relaxed">
-              <span className="text-ink font-medium">Gap the AI will avoid:</span>{' '}
-              {initialSourceContext.missing_signal}
+          {prefilling ? (
+            <p className="text-sm text-driftwood italic">
+              Reading your previous resume + the analyzer&apos;s findings…
+            </p>
+          ) : sourceContext ? (
+            <>
+              <p className="text-sm text-ink mb-2">
+                Source:{' '}
+                <span className="font-medium">
+                  {sourceContext.file_name ?? 'previous resume'}
+                </span>
+              </p>
+              {sourceContext.missing_signal && (
+                <p className="text-[13px] text-driftwood leading-relaxed">
+                  <span className="text-ink font-medium">Gap the AI will avoid:</span>{' '}
+                  {sourceContext.missing_signal}
+                </p>
+              )}
+              {sourceContext.top_strengths && sourceContext.top_strengths.length > 0 && (
+                <p className="text-[13px] text-driftwood leading-relaxed mt-1.5">
+                  <span className="text-ink font-medium">Strengths to lean into:</span>{' '}
+                  {sourceContext.top_strengths.slice(0, 3).join(' · ')}
+                </p>
+              )}
+              <p className="text-[12px] text-driftwood/70 mt-3">
+                Every section we could extract from the PDF — contact,
+                education, experiences, projects, activities, skills,
+                awards — has been pre-filled. Edit anything below.
+              </p>
+            </>
+          ) : (
+            <p className="text-[13px] text-clay">
+              Couldn&apos;t load the prefill. You can still build manually below.
             </p>
           )}
-          {initialSourceContext.top_strengths && initialSourceContext.top_strengths.length > 0 && (
-            <p className="text-[13px] text-driftwood leading-relaxed mt-1.5">
-              <span className="text-ink font-medium">Strengths to lean into:</span>{' '}
-              {initialSourceContext.top_strengths.slice(0, 3).join(' · ')}
-            </p>
-          )}
-          <p className="text-[12px] text-driftwood/70 mt-3">
-            Your target metadata and the best-parsed fields from the scan
-            (contact, education, experiences, skills) have been pre-filled.
-            Edit or add anything else below, then build — the analyzer&apos;s
-            findings will be woven into the generated resume.
-          </p>
         </div>
       )}
 

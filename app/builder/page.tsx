@@ -3,7 +3,6 @@ import { LandingNav } from '@/components/landing/nav'
 import { BuilderFlow } from '@/components/builder/builder-flow'
 import { CreditsAddedBanner } from '@/components/upload/credits-added-banner'
 import { createClient } from '@/lib/supabase/server'
-import { loadBuilderSourceContext, type BuilderSourceContext } from '@/lib/builder/source-context'
 
 export const metadata = {
   title: 'Builder — tyr',
@@ -16,14 +15,15 @@ interface PageProps {
 export default async function BuilderPage({ searchParams }: PageProps) {
   const { from } = await searchParams
 
-  let sourceContext: BuilderSourceContext | null = null
+  // Auth-gate only — the actual prefill loads client-side via
+  // /api/builder/prefill so the page render isn't blocked by a Haiku
+  // LLM call (was making /builder?from=X take 5-10s to TTFB).
   if (from) {
     const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) redirect(`/login?next=${encodeURIComponent(`/builder?from=${from}`)}`)
-    sourceContext = await loadBuilderSourceContext(from, user.id)
   }
 
   return (
@@ -59,7 +59,7 @@ export default async function BuilderPage({ searchParams }: PageProps) {
           </div>
         </div>
         <CreditsAddedBanner />
-        <BuilderFlow initialSourceContext={sourceContext} />
+        <BuilderFlow sourceResumeId={from ?? null} />
       </div>
     </main>
   )

@@ -16,6 +16,11 @@ import type { BuilderInput } from '@/lib/builder/types'
 import { isAdminEmail } from '@/lib/admin'
 import { loadBuilderSourceContext, buildInsightsAddendum } from '@/lib/builder/source-context'
 
+// Generation + DB writes can take 20-40s wall-clock; Vercel's default
+// route timeout is 10s on Hobby and the browser surfaces it as a
+// "Failed to fetch" with zero detail. Bump explicitly.
+export const maxDuration = 60
+
 export async function POST(request: Request) {
   try {
     return await handleBuilder(request)
@@ -111,9 +116,12 @@ async function handleBuilder(request: Request) {
   const isInternship = !!body.is_internship
 
   // Optional: condition generation on insights from a prior resume scan.
+  // withExtraction:false skips the Haiku call — we only need the
+  // missing_signal + top_strengths consensus, not the prefill input
+  // (the user has the form open with their input already filled in).
   let insightsAddendum = ''
   if (body.source_resume_id) {
-    const source = await loadBuilderSourceContext(body.source_resume_id, user.id)
+    const source = await loadBuilderSourceContext(body.source_resume_id, user.id, { withExtraction: false })
     insightsAddendum = buildInsightsAddendum(source)
   }
 

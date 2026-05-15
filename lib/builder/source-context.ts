@@ -23,9 +23,14 @@ export interface BuilderSourceContext {
   prefilled_input: BuilderInput | null
 }
 
+// Default: full context including the Haiku-extracted prefill. Used by
+// /api/builder/prefill (client-side fetch). The heavy LLM call is gated
+// by `withExtraction` so /api/builder POST can skip it — that endpoint
+// only needs target metadata + insights consensus.
 export async function loadBuilderSourceContext(
   resumeId: string,
-  candidateId: string
+  candidateId: string,
+  options: { withExtraction?: boolean } = { withExtraction: true }
 ): Promise<BuilderSourceContext | null> {
   const service = createServiceClient()
 
@@ -52,20 +57,22 @@ export async function loadBuilderSourceContext(
   // projects, activities, and awards which the canonical parsers don't
   // touch — and works regardless of which parser succeeded. Falls back to
   // canonical_data mapping if extraction fails (no key, LLM 5xx, etc.).
-  const rawText = (resume.raw_text as string | null) ?? ''
   let prefilledInput: BuilderInput | null = null
-  if (rawText.trim().length >= 50) {
-    prefilledInput = await extractBuilderInputFromText(rawText)
-  }
-  if (!prefilledInput) {
-    const { data: parses } = await service
-      .from('parse_results')
-      .select('canonical_data, parse_score')
-      .eq('resume_id', resumeId)
-      .order('parse_score', { ascending: false, nullsFirst: false })
-      .limit(1)
-    const canonical = (parses && parses[0]?.canonical_data) as CanonicalResume | null | undefined
-    prefilledInput = canonical ? canonicalToBuilderInput(canonical) : null
+  if (options.withExtraction !== false) {
+    const rawText = (resume.raw_text as string | null) ?? ''
+    if (rawText.trim().length >= 50) {
+      prefilledInput = await extractBuilderInputFromText(rawText)
+    }
+    if (!prefilledInput) {
+      const { data: parses } = await service
+        .from('parse_results')
+        .select('canonical_data, parse_score')
+        .eq('resume_id', resumeId)
+        .order('parse_score', { ascending: false, nullsFirst: false })
+        .limit(1)
+      const canonical = (parses && parses[0]?.canonical_data) as CanonicalResume | null | undefined
+      prefilledInput = canonical ? canonicalToBuilderInput(canonical) : null
+    }
   }
 
   return {

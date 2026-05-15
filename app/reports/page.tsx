@@ -15,6 +15,7 @@ interface ResumeRow {
   target_role: string | null
   target_company: string | null
   created_at: string
+  input_kind: 'pdf' | 'url' | 'image' | 'builder' | null
 }
 
 interface DisagreementRow {
@@ -49,7 +50,7 @@ export default async function ReportsPage() {
   // Postgres join through PostgREST and keeps the queries readable.
   const resumeQuery = service
     .from('resumes')
-    .select('id, file_name, target_role, target_company, created_at')
+    .select('id, file_name, target_role, target_company, created_at, input_kind')
     .eq('candidate_id', user.id)
     .order('created_at', { ascending: false })
 
@@ -94,6 +95,7 @@ export default async function ReportsPage() {
       created_at: r.created_at,
       parser_agreement: overall === null ? null : 1 - overall,
       ai_legibility: perceptionMap.get(r.id) ?? null,
+      input_kind: r.input_kind,
     }
   })
 

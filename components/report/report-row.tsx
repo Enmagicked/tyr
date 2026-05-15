@@ -11,6 +11,9 @@ export interface ReportRowData {
   created_at: string
   parser_agreement: number | null    // 1 - parse_disagreement.overall_score, or null
   ai_legibility: number | null        // 0..100
+  // M9.5: 'builder' rows route to /builder/[id] (the editable preview)
+  // instead of /report/[id] (the analyzer dashboard).
+  input_kind?: 'pdf' | 'url' | 'image' | 'builder' | null
 }
 
 function relativeAge(createdAt: string): string {
@@ -33,20 +36,31 @@ function pct(n: number | null): string {
 }
 
 export function ReportRow({ row }: { row: ReportRowData }) {
+  const isBuilder = row.input_kind === 'builder'
+  const href = isBuilder ? `/builder/${row.id}` : `/report/${row.id}`
   return (
     <Link
-      href={`/report/${row.id}`}
+      href={href}
       className="block bg-paper border border-bone rounded-[12px] p-5 hover:border-ink/30 transition-colors"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="font-serif text-[20px] text-ink truncate">
-            {row.file_name}
+          <div className="flex items-center gap-2 mb-1">
+            <div className="font-serif text-[20px] text-ink truncate">
+              {row.file_name}
+            </div>
+            {isBuilder && (
+              <span className="inline-flex items-center text-[10px] font-semibold tracking-[0.12em] uppercase px-2 py-0.5 rounded-full bg-marigold/20 text-ink border border-marigold/40 flex-shrink-0">
+                Builder
+              </span>
+            )}
           </div>
-          <div className="text-xs text-driftwood mt-1 truncate">
+          <div className="text-xs text-driftwood truncate">
             {row.target_role && row.target_company
               ? `${row.target_role} at ${row.target_company}`
-              : 'no target set'}
+              : row.target_role
+                ? row.target_role
+                : 'no target set'}
             <span className="mx-2 text-driftwood/40">·</span>
             {relativeAge(row.created_at)}
           </div>
