@@ -15,11 +15,13 @@ interface LandingNavProps {
 
 const ANON_NAV_LINKS = [
   { label: 'How it works', href: '/#how-it-works' },
+  { label: 'Decoder', href: '/upload' },
   { label: 'Builder', href: '/builder' },
   { label: 'FAQ', href: '/#faq' },
 ]
 
 const AUTHED_NAV_LINKS = [
+  { label: 'Decoder', href: '/upload' },
   { label: 'Builder', href: '/builder' },
   { label: 'My reports', href: '/reports' },
   { label: 'Account', href: '/account' },
