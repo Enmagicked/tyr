@@ -1,10 +1,82 @@
 # tyr — current state
 
-> **Read this first** if you're a new Claude session. Updated 2026-05-13 after M9 shipped to prod.
+> **Read this first** if you're a new Claude session. Updated 2026-05-15 mid-launch (M9.5 live, polish iteration in flight).
 
 ---
 
-## ⚡ RESUME HERE (session handoff 2026-05-13, post-M9)
+## ⚡ RESUME HERE (session handoff 2026-05-15, M9.5 in flight)
+
+**Launching today.** M9.5 (Activities Builder + internship preset + rebuild flow) is live on prod. The user has been iterating on polish/bugs all day. Most recent open item: prefill extraction quality — see "Open issues" below.
+
+### What's live on prod (last commit deployed = `ea5f673`)
+1. **Decoder + Builder both fully working end-to-end** with Stripe paywall
+   - Free credit on signup is **analyzer-only**; builder requires a prior purchase (BUILDER_LOCKED 402 + paywall modal)
+2. **Admin bypass** via `ADMIN_EMAILS` env var (set in Vercel — `fullofmagic4731@gmail.com`)
+3. **Llama back in rotation** — was silent because `TOGETHER_API_KEY` was never added to Vercel; added it and now 4-of-4 LLMs respond
+4. **Internship preset** toggle wired through the entire analyzer (8 perception queries + summary prompt)
+5. **Rebuild flow:** report page → big "Rebuild" CTA card → `/builder?from=<resumeId>` → client-side Claude Haiku extraction prefills the form (contact / education / experiences / projects / activities / skills / awards) + banner shows the analyzer's gap to avoid + strengths to lean into
+6. **LLM as third parser** (`parse_llm` node, alongside openresume + naive) — fixes "0 of 0 bullets quantified" on awkward resumes and gives the disagreement scorer a high-quality anchor
+7. **Naive education extraction** — uses `seed-schools.json` aliases, kills the "Education 0% agreement" misleading chart row
+8. **OCR via Claude Vision** for image uploads (Affinda was unreliable trial-tier); Affinda kept for PDF OCR fallback only
+9. **`/privacy` + `/terms`** pages live, footer links wired
+10. **Legal + nav:** Decoder + Builder both in main nav (anon + authed). Hero CTA + upload page CTA point users to `/builder` when they don't have a resume yet.
+11. **`/reports`** now lists builder drafts with a marigold "Builder" badge; rows route to `/builder/<id>` (editable preview) instead of `/report/<id>`
+12. **Rewrite cap (5/draft) error** now surfaces in a dismissible banner with the buttons disappearing past the cap (was silently failing)
+13. **Postgres null-byte fix** (`22P05`) — strip `\0` from raw_text/target_role/target_company/target_jd at the API boundary
+14. **Role field** clearly accepts freeform input (was looking like a closed dropdown)
+15. **Favicon** swapped in (`app/favicon.ico`)
+
+### Open issues / known weak points as of last commit
+- **Prefill extraction is currently using Haiku** (`claude-haiku-4-5-20251001`). Per user preference for speed-over-completeness AFTER Sonnet repeatedly hit the 25s abort timeout on cold starts.
+  - Haiku may extract only partial data on some resumes (user previously saw "only skills" — meaning skills came back from the **canonical fallback** because Haiku returned null, not because Haiku only emitted skills)
+  - If Haiku returns null, we fall through to `canonicalToBuilderInput(canonical)` which uses naive's KNOWN_SKILLS keyword match — that's why an empty-extraction prefill still shows a few skills + a `• • • •` name (naive's first-line heuristic hitting bullet chars)
+  - Cache namespace currently `builder_extract:v3` (post Sonnet → Haiku revert)
+  - Prefill route `/api/builder/prefill` has `maxDuration = 60`; internal Haiku call has `AbortController` timeout at **50s** (was 25, bumped after Sonnet abort issue)
+- Big loading UI now warns users prefill can take ~1 minute on cold start — visible spinner, two-step progress dots, "please don't refresh" copy
+
+### Critical commits in this session (since `M9.5 d92683b`)
+- `81afc55` — discoverability (Decoder/Builder nav, hero + upload CTAs, builder page rewrite-loop pitch) + OCR Claude Vision
+- `d9f8dcb` — `ADMIN_EMAILS` bypass on `/api/upload`, `/api/builder`, `/api/builder/rewrite-bullet`
+- `ae8a361` — favicon + `/privacy` + `/terms` + rewrite-limit UI
+- `0d16093` — `[graph] node_failed` console.error (surfaced Llama silent failure → revealed missing `TOGETHER_API_KEY`)
+- `064cb94` — strip `\0` NUL bytes from text fields (`22P05` fix)
+- `5a45eb7` — role field "or type your own" UX hint
+- `969a052` — naive education extraction (seed-schools alias scan) + rebuild flow CTA
+- `a42fe87` — Claude Haiku BuilderInput extractor (initial; switched to Sonnet, then back to Haiku later)
+- `e3e1b20` — `parse_llm` graph node + chart label "3 parsers"
+- `9e75a29`, `bc80f76`, `defdbf0` — debug-friendly error surfacing in upload + builder
+- `2a6cb9a` — async client-side prefill via new `/api/builder/prefill` endpoint + `/reports` builder-row routing + `maxDuration=60` on `/api/builder`
+- `4b8a1b0` — prefill loading spinner banner
+- `7c2dc59` — Decoder nav link
+- `359544f` — Haiku dated slug `claude-haiku-4-5-20251001` (bare alias 404s)
+- `7eec932` — Sonnet swap for extraction reliability (later reverted)
+- `73c4321` — abort bump 25s → 50s for extraction
+- `ea5f673` — **CURRENT** — back to Haiku + prominent loading UI w/ "~1 minute" warning
+
+### Critical file paths (post-launch additions)
+- `lib/builder/extract.ts` — Haiku-based BuilderInput extractor with cache namespace `builder_extract:v3`, 50s AbortController. **Bumps namespace when model changes.**
+- `lib/builder/source-context.ts` — `loadBuilderSourceContext(resumeId, candidateId, { withExtraction })`. `withExtraction:false` for `/api/builder` POST (cheap), `withExtraction:true` for prefill (Haiku call)
+- `app/api/builder/prefill/route.ts` — GET endpoint, `maxDuration=60`, returns `BuilderSourceContext` with `prefilled_input`
+- `lib/agents/parse-llm.ts` — third parser node, returns `ParseResult` with `parser_name: 'llm'`, coverage-based `parse_score` (cap 0.95)
+- `lib/admin.ts` — `isAdminEmail()` via `ADMIN_EMAILS` env var (comma-separated, case-insensitive)
+
+### What to know about the architecture (post-M9.5)
+- **3 parsers now:** openresume + naive + llm. Aggregator picks first-with-bullets for `analyze_bullets.source_parser` → typically LLM wins on awkward resumes
+- **Cache namespaces in play:** `apeds:v5` (perception), `apeds_summary:v4` (summary), `builder:v1` (resume generation), `builder_rewrite:v1` (bullet rewrites), `builder_extract:v3` (prefill extraction)
+- **Insights-conditioned generation:** `/api/builder` POST loads `missing_signal` + `top_strengths` consensus from source resume (no Haiku call) and appends to the prompt at call time. Not part of `lib/builder/prompts.lock.json` — it's a runtime addendum so the lockfile invariant stays intact
+- **Migration 0010** applied to prod: extends `input_kind` CHECK to include `'builder'`, adds `is_internship` + `builder_input` jsonb + `builder_rewrites_used` int
+
+### What to investigate next session (if user reports prefill still empty)
+1. Check Vercel logs for `[builder.extract]` lines — they explicitly say which stage failed (empty response / parse / validate / abort)
+2. If Haiku consistently returns shallow JSON, options are:
+   - Stream the response so it can use full max_tokens without timing out
+   - Two-pass extraction (Haiku for short sections, Sonnet for long descriptions)
+   - Pre-cache extraction at upload time (background job, no user-facing latency)
+3. Sonnet was reverted because of cold-start aborts. If we want to try again, increase route `maxDuration` past 60s (requires Vercel Pro / Enterprise) or split into multiple smaller calls
+
+---
+
+## ⚡ PRIOR HANDOFF (2026-05-13, post-M9)
 
 **M9 is LIVE on prod.** Paywall works end-to-end: free 1 credit on signup → 402 modal on exhaustion → Stripe Checkout → webhook adds credits → next upload succeeds. Smoke-tested with a real $6 charge.
 
