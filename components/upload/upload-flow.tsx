@@ -6,7 +6,7 @@ import posthog from 'posthog-js'
 import { TargetForm } from './target-form'
 import { isValidTarget, type TargetInput } from './target-validation'
 
-type Step = 'idle' | 'uploading' | 'analyzing' | 'done' | 'error' | 'paywalled'
+type Step = 'idle' | 'uploading' | 'analyzing' | 'done' | 'error'
 
 const STEP_LABELS: Record<Step, string> = {
   idle: 'Ready',
@@ -14,7 +14,6 @@ const STEP_LABELS: Record<Step, string> = {
   analyzing: 'Analyzing — running parsers and AI models…',
   done: 'Done. Redirecting…',
   error: 'Something went wrong',
-  paywalled: 'Out of credits',
 }
 
 interface GraphEvent {
@@ -68,11 +67,8 @@ export function UploadFlow() {
   const [errorMsg, setErrorMsg] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const [currentNode, setCurrentNode] = useState<string | null>(null)
-  const [buyingCredits, setBuyingCredits] = useState(false)
-  const [isFirstPurchase, setIsFirstPurchase] = useState(true)
-
   const targetReady = isValidTarget(target)
-  const isActive = step !== 'idle' && step !== 'error' && step !== 'paywalled'
+  const isActive = step !== 'idle' && step !== 'error'
   const urlReady = inputKind === 'url' && url.trim().length > 0
 
   // Common submit path. PDF / image branches pass a `file`; URL branch passes
@@ -116,9 +112,7 @@ export function UploadFlow() {
 
       const uploadRes = await fetch('/api/upload', { method: 'POST', body: uploadForm })
       if (uploadRes.status === 402) {
-        const body = await uploadRes.json().catch(() => ({}))
-        setIsFirstPurchase(body.is_first_purchase ?? true)
-        setStep('paywalled')
+        window.location.href = '/paywall?from=upload'
         return
       }
       if (!uploadRes.ok) {
@@ -190,25 +184,6 @@ export function UploadFlow() {
     if (file) submit(file)
   }
 
-  async function buyCredits(tier: 'intro' | 'single' | 'bulk') {
-    setBuyingCredits(true)
-    posthog.capture('checkout_started', { tier })
-    try {
-      const res = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier, return_to: '/upload' }),
-      })
-      const { url, error } = await res.json()
-      if (!res.ok || !url) throw new Error(error ?? 'Could not start checkout')
-      window.location.href = url
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Checkout failed')
-      setStep('error')
-      setBuyingCredits(false)
-    }
-  }
-
   const dropzoneActive = inputKind !== 'url' && targetReady && !isActive
 
   return (
@@ -245,52 +220,7 @@ export function UploadFlow() {
         })}
       </div>
 
-      {step === 'paywalled' ? (
-        <div className="flex flex-col gap-5 rounded-2xl border border-bone bg-paper/60 p-8 text-center">
-          <div>
-            <p className="font-serif text-2xl text-ink mb-1">
-              {isFirstPurchase ? 'Unlock your first decode' : 'You’re out of credits'}
-            </p>
-            <p className="text-sm text-driftwood">
-              {isFirstPurchase
-                ? 'One-time $4 to see how 4 frontier LLMs read your resume. Credits never expire.'
-                : 'Buy a pack to keep decoding. Credits never expire.'}
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            {isFirstPurchase ? (
-              <button
-                onClick={() => buyCredits('intro')}
-                disabled={buyingCredits}
-                className="flex-1 rounded-full bg-marigold px-5 py-3 text-sm font-medium text-ink hover:brightness-105 disabled:opacity-40 transition-all"
-              >
-                {buyingCredits ? '…' : 'Intro — 1 decode — $4'}
-              </button>
-            ) : (
-              <button
-                onClick={() => buyCredits('single')}
-                disabled={buyingCredits}
-                className="flex-1 rounded-full border border-bone bg-vellum/50 px-5 py-3 text-sm font-medium text-ink hover:bg-bone disabled:opacity-40 transition-colors"
-              >
-                {buyingCredits ? '…' : '1 decode — $6'}
-              </button>
-            )}
-            <button
-              onClick={() => buyCredits('bulk')}
-              disabled={buyingCredits}
-              className="flex-1 rounded-full bg-ink px-5 py-3 text-sm font-medium text-vellum hover:bg-ink/90 disabled:opacity-40 transition-colors"
-            >
-              {buyingCredits ? '…' : '5 decodes — $15'}
-            </button>
-          </div>
-          <button
-            onClick={() => setStep('idle')}
-            className="text-xs text-driftwood underline"
-          >
-            Cancel
-          </button>
-        </div>
-      ) : isActive ? (
+      {isActive ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-driftwood/40 bg-paper/40 p-16 text-center">
           <Spinner />
           <p className="text-sm text-ink">{STEP_LABELS[step]}</p>

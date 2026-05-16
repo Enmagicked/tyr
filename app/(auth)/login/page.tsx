@@ -3,35 +3,37 @@
 import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import posthog from 'posthog-js'
 
 function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
+  const [loading, setLoading] = useState<'signing' | 'redirecting' | null>(null)
   const search = useSearchParams()
   const next = search.get('next') ?? '/upload'
   const otpExpired = search.get('error') === 'otp_expired'
 
   async function login() {
-    setLoading(true)
+    setLoading('signing')
     setError('')
     const supabase = createClient()
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setError(error.message)
-      setLoading(false)
-    } else {
-      if (data.user) {
-        posthog.identify(data.user.id, { email: data.user.email })
-        posthog.capture('user_logged_in', { email: data.user.email })
-      }
-      router.push(next)
-      router.refresh()
+      setLoading(null)
+      return
     }
+    if (data.user) {
+      posthog.identify(data.user.id, { email: data.user.email })
+      posthog.capture('user_logged_in', { email: data.user.email })
+    }
+    // Hard navigation — Next router.push() leaves the button stuck on
+    // "Signing in…" while the destination RSC streams. window.location
+    // gives the browser its native progress bar and a guaranteed unmount.
+    setLoading('redirecting')
+    window.location.href = next
   }
 
   return (
@@ -79,10 +81,10 @@ function LoginForm() {
 
         <button
           onClick={login}
-          disabled={loading}
+          disabled={loading !== null}
           className="rounded-full bg-ink py-2.5 text-sm font-medium text-vellum hover:bg-ink/90 disabled:opacity-40 transition-colors"
         >
-          {loading ? 'Signing in…' : 'Sign in'}
+          {loading === 'redirecting' ? 'Redirecting…' : loading === 'signing' ? 'Signing in…' : 'Sign in'}
         </button>
 
         <div className="flex flex-col gap-2 text-sm text-driftwood text-center">

@@ -1,33 +1,34 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import posthog from 'posthog-js'
 
-export default function SignupPage() {
+function SignupForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState<'creating' | 'redirecting' | null>(null)
   const [done, setDone] = useState(false)
-  const router = useRouter()
+  const search = useSearchParams()
+  const next = search.get('next') ?? '/upload'
 
   async function signup() {
-    setLoading(true)
+    setLoading('creating')
     setError('')
     const supabase = createClient()
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     })
     if (error) {
       setError(error.message)
-      setLoading(false)
+      setLoading(null)
       return
     }
     if (data.user) {
@@ -39,8 +40,8 @@ export default function SignupPage() {
     // email" screen and route them straight into the app. When confirmation
     // is ON, data.session is null and we show the check-email message.
     if (data.session) {
-      router.push('/upload')
-      router.refresh()
+      setLoading('redirecting')
+      window.location.href = next
     } else {
       setDone(true)
     }
@@ -97,19 +98,27 @@ export default function SignupPage() {
 
         <button
           onClick={signup}
-          disabled={loading}
+          disabled={loading !== null}
           className="rounded-full bg-ink py-2.5 text-sm font-medium text-vellum hover:bg-ink/90 disabled:opacity-40 transition-colors"
         >
-          {loading ? 'Creating account…' : 'Create account'}
+          {loading === 'redirecting' ? 'Redirecting…' : loading === 'creating' ? 'Creating account…' : 'Create account'}
         </button>
 
         <p className="text-sm text-driftwood text-center">
           Already have an account?{' '}
-          <Link href="/login" className="text-ink underline">
+          <Link href={`/login?next=${encodeURIComponent(next)}`} className="text-ink underline">
             Sign in
           </Link>
         </p>
       </div>
     </main>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
   )
 }

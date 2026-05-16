@@ -9,7 +9,7 @@ import { isValidTarget, type TargetInput } from '@/components/upload/target-vali
 import type { BuilderInput } from '@/lib/builder/types'
 import type { BuilderSourceContext } from '@/lib/builder/source-context'
 
-type Step = 'idle' | 'generating' | 'analyzing' | 'paywalled' | 'error'
+type Step = 'idle' | 'generating' | 'analyzing' | 'error'
 
 interface GraphEvent {
   type: string
@@ -78,8 +78,6 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
   const [step, setStep] = useState<Step>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [currentNode, setCurrentNode] = useState<string | null>(null)
-  const [buyingCredits, setBuyingCredits] = useState(false)
-  const [isFirstPurchase, setIsFirstPurchase] = useState(true)
 
   const formReady =
     input.contact.name.trim().length > 0 &&
@@ -91,27 +89,6 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
       input.education.length > 0)
 
   const isActive = step === 'generating' || step === 'analyzing'
-
-  async function buyCredits(tier: 'intro' | 'single' | 'bulk') {
-    setBuyingCredits(true)
-    try {
-      const r = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier, return_to: '/builder' }),
-      })
-      if (!r.ok) {
-        const { error } = await r.json().catch(() => ({ error: `HTTP ${r.status}` }))
-        throw new Error(error ?? 'Checkout failed')
-      }
-      const { url } = (await r.json()) as { url: string }
-      window.location.href = url
-    } catch (err) {
-      setBuyingCredits(false)
-      setErrorMsg(err instanceof Error ? err.message : 'Checkout failed')
-      setStep('error')
-    }
-  }
 
   async function submit() {
     if (!formReady) {
@@ -146,9 +123,7 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
       })
 
       if (r.status === 402) {
-        const body = (await r.json().catch(() => ({}))) as { is_first_purchase?: boolean }
-        setIsFirstPurchase(body.is_first_purchase ?? true)
-        setStep('paywalled')
+        window.location.href = '/paywall?from=builder'
         return
       }
       if (!r.ok) {
@@ -303,15 +278,6 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
         </div>
       )}
 
-      {step === 'paywalled' && (
-        <PaywallModal
-          isFirstPurchase={isFirstPurchase}
-          buying={buyingCredits}
-          onBuy={buyCredits}
-          onClose={() => setStep('idle')}
-        />
-      )}
-
       {isActive ? (
         <div className="rounded-2xl border border-bone bg-paper p-6 text-center">
           <p className="font-serif text-2xl text-ink mb-2">
@@ -342,61 +308,3 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
   )
 }
 
-interface PaywallModalProps {
-  isFirstPurchase: boolean
-  buying: boolean
-  onBuy: (tier: 'intro' | 'single' | 'bulk') => void
-  onClose: () => void
-}
-
-function PaywallModal({ isFirstPurchase, buying, onBuy, onClose }: PaywallModalProps) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-6">
-      <div className="max-w-md w-full rounded-2xl bg-paper p-8 shadow-xl">
-        <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-driftwood mb-2">
-          {isFirstPurchase ? 'Get started' : 'Out of credits'}
-        </p>
-        <h2 className="font-serif text-2xl text-ink mb-3">
-          {isFirstPurchase ? 'Unlock your first build' : 'Buy credits to keep going'}
-        </h2>
-        <p className="text-sm text-driftwood leading-relaxed mb-6">
-          {isFirstPurchase
-            ? 'One-time $4 to generate your resume and score it through 4 frontier LLMs. Credits never expire.'
-            : 'Each build is 1 credit. Pick a pack:'}
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          {isFirstPurchase ? (
-            <button
-              onClick={() => onBuy('intro')}
-              disabled={buying}
-              className="flex-1 rounded-full bg-marigold px-5 py-3 text-sm font-medium text-ink hover:brightness-105 disabled:opacity-40 transition-all"
-            >
-              {buying ? '…' : 'Intro — 1 build — $4'}
-            </button>
-          ) : (
-            <button
-              onClick={() => onBuy('single')}
-              disabled={buying}
-              className="flex-1 rounded-full border border-bone bg-vellum/50 px-5 py-3 text-sm font-medium text-ink hover:bg-bone disabled:opacity-40 transition-colors"
-            >
-              {buying ? '…' : '1 decode — $6'}
-            </button>
-          )}
-          <button
-            onClick={() => onBuy('bulk')}
-            disabled={buying}
-            className="flex-1 rounded-full bg-ink px-5 py-3 text-sm font-medium text-vellum hover:bg-ink/90 disabled:opacity-40 transition-colors"
-          >
-            {buying ? '…' : '5 decodes — $15'}
-          </button>
-        </div>
-        <button
-          onClick={onClose}
-          className="mt-4 w-full text-[12px] text-driftwood/80 hover:text-ink"
-        >
-          Maybe later
-        </button>
-      </div>
-    </div>
-  )
-}
