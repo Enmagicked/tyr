@@ -39,9 +39,8 @@ export default async function BuilderPage({ searchParams }: PageProps) {
             <em className="italic text-marigold">Rewrite the weak bullets.</em>
           </h1>
           <p className="mt-4 text-driftwood max-w-lg mx-auto leading-[1.72]">
-            Most resume tools stop at &ldquo;here&apos;s your resume.&rdquo;
             Tyr generates one, then immediately runs it through the same
-            4 recruiter-AIs that grade real resumes — and lets you hover
+            algorithm that mimics grading real resumes — and lets you hover
             any bullet to surgically rewrite it without breaking the rest.
           </p>
           <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-3 text-[12px] text-driftwood/80">

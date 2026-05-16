@@ -122,7 +122,7 @@ export function Hero() {
             }}
           >
             Four frontier LLMs and three ATS parsers read your resume in
-            parallel. Tyr surfaces where they agree, where they disagree,
+            parallel. Tyr's unique mathematical algorithm surfaces where they agree, where they disagree,
             and what that gap tells you about how you will be read.
           </p>
           <div
@@ -137,21 +137,13 @@ export function Hero() {
               Decode my resume →
             </Link>
             <Link
-              href="/sample"
-              onClick={() => posthog.capture('cta_click', { location: 'hero_secondary', destination: '/sample' })}
-              className="text-sm font-medium px-7 py-3 rounded-full border border-vellum/30 text-vellum/90 hover:bg-vellum/10 hover:text-vellum transition-colors duration-200"
+              href="/builder"
+              onClick={() => posthog.capture('cta_click', { location: 'hero_secondary', destination: '/builder' })}
+              className="text-sm font-medium px-7 py-3 rounded-full bg-marigold/95 text-ink shadow-[0_4px_28px_rgba(15,24,48,.22)] hover:bg-marigold hover:scale-[1.025] hover:shadow-[0_6px_36px_rgba(15,24,48,.3)] transition-all duration-200"
             >
-              View sample
+              No resume yet? Build one →
             </Link>
           </div>
-          <Link
-            href="/builder"
-            onClick={() => posthog.capture('cta_click', { location: 'hero_tertiary', destination: '/builder' })}
-            className="mt-5 text-[13px] text-vellum/60 hover:text-vellum/90 underline underline-offset-4 decoration-vellum/30 hover:decoration-vellum/70 animate-fade-up transition-colors"
-            style={{ animationDelay: '0.38s' }}
-          >
-            No resume yet? Build one from your activities →
-          </Link>
         </div>
 
         {/* scroll cue */}

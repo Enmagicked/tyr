@@ -12,7 +12,6 @@ import { ParserDisagreementCard } from '@/components/report/parser-disagreement-
 import { PerceptionGrid } from '@/components/report/perception-grid'
 import { InterModalDelta } from '@/components/report/inter-modal-delta'
 import { ConsensusList, ConsensusText } from '@/components/report/consensus-blocks'
-import { CaveatCard } from '@/components/report/caveat-card'
 import { PlainSummarySection } from '@/components/report/plain-summary'
 import sampleData from '@/lib/sample/sample-report.json'
 
@@ -147,20 +146,16 @@ export default function SamplePage() {
           <ConsensusList
             label="Top strengths · consensus"
             items={data.consensus.top_strengths}
-            caveat="Across surviving LLMs, ranked by mention frequency."
           />
           <ConsensusText
             label="Missing signal · consensus"
             text={data.consensus.missing_signal}
-            caveat="Most-detailed answer from any responding LLM."
           />
         </section>
 
         <section className="mb-10 animate-fade-up">
           <PlainSummarySection summary={data.perception.plain_summary} />
         </section>
-
-        <CaveatCard />
       </div>
     </main>
   )

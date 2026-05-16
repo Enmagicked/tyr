@@ -88,8 +88,7 @@ export function InterModalDelta({ value }: InterModalDeltaProps) {
           </div>
           <p className="text-xs text-driftwood/80 mt-3 leading-relaxed">
             How far the LLM read of your seniority drifts from what the ATS
-            parsers extracted as your level. Soft signal — calibration improves
-            in M5.
+            parsers extracted as your level. Soft signal.
           </p>
         </>
       )}

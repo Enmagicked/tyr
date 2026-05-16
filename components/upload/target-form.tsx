@@ -76,8 +76,8 @@ export function TargetForm({ value, onChange, disabled }: TargetFormProps) {
             ))}
           </datalist>
           <span className="text-[11px] text-driftwood/70">
-            Suggestions are just shortcuts — type anything (e.g. &ldquo;Quant
-            Trader at a prop shop&rdquo;).
+            Type anything (e.g. &ldquo;Quant
+            Trading&rdquo;).
           </span>
           {validation.errors.target_role && value.target_role.length > 0 && (
             <span className="text-xs text-clay">

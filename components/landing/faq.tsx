@@ -6,7 +6,7 @@ import { useId, useState } from 'react'
 const ITEMS = [
   {
     q: 'Which AI models does tyr use?',
-    a: 'Four heterogeneous frontier LLMs — GPT-4o, Claude Sonnet, Gemini, and Llama 3.1 70B. Each receives the same eight structured queries about your resume. We measure numerical disagreement (σ across scalar judgments) and reasoning dispersion (ρ across embedded explanations). Disagreement is treated as a calibrated uncertainty signal, not noise.',
+    a: 'Four heterogeneous frontier LLMs — GPT-4o, Claude Sonnet, Gemini, and Llama 3.1 70B. Each receives the same eight structured queries about your resume. This gets fed into our algorithm in which we measure numerical disagreement (σ across scalar judgments) and reasoning dispersion (ρ across embedded explanations). Disagreement is treated as a calibrated uncertainty signal, not noise.',
   },
   {
     q: 'How does the ATS analysis work?',
@@ -14,7 +14,7 @@ const ITEMS = [
   },
   {
     q: 'What does disagreement actually tell me?',
-    a: 'Two readings. High σ on a scalar query (e.g. seniority) means LLM-powered screeners will reach different conclusions about you depending on which one they use — your resume reads ambiguously. High ρ on reasoning text means the models are looking at different signals to arrive at their answer — your resume is multi-interpretable. Both are addressable with concrete edits.',
+    a: 'Two readings. This gets feeded into our algorithm. High σ on a scalar query (e.g. seniority) means LLM-powered screeners will reach different conclusions about you depending on which one they use — your resume reads ambiguously. High ρ on reasoning text means the models are looking at different signals to arrive at their answer — your resume is multi-interpretable. Both are addressable with concrete edits.',
   },
   {
     q: 'Is my resume stored?',
@@ -22,7 +22,7 @@ const ITEMS = [
   },
   {
     q: 'How accurate is this?',
-    a: 'The disagreement score is robust by construction — if three parsers extract the same field, real ATSes overwhelmingly will too. The σ and ρ metrics are calibrated against a 5,000-resume reference distribution. We do not claim to predict any specific employer’s hiring decision; we measure how the AI layer of the funnel reads you, with explicit uncertainty.',
+    a: 'The disagreement score is robust by construction — if three parsers extract the same field, real ATSes overwhelmingly will too. The σ and ρ metrics are calibrated against a 5,000-resume reference distribution. We do not claim to predict any specific employer’s hiring decision; we measure how the AI layer of the funnel reads you, with certainty.',
   },
 ]
 

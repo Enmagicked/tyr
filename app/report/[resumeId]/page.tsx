@@ -257,16 +257,14 @@ export default async function ReportPage({ params }: PageProps) {
           <ConsensusList
             label="Top strengths · consensus"
             items={topStrengths}
-            caveat="Across surviving LLMs, ranked by mention frequency."
           />
           <ConsensusText
             label="Missing signal · consensus"
             text={missingSignal}
-            caveat="Most-detailed answer from any responding LLM."
           />
         </section>
 
-        {/* M5: plain-English summary — narrative version of everything above */}
+        {/* plain-English summary — narrative version of everything above */}
         <section className="mb-10 animate-fade-up">
           <PlainSummarySection summary={perception?.plain_summary ?? null} />
         </section>
