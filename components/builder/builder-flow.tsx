@@ -9,7 +9,7 @@ import { isValidTarget, type TargetInput } from '@/components/upload/target-vali
 import type { BuilderInput } from '@/lib/builder/types'
 import type { BuilderSourceContext } from '@/lib/builder/source-context'
 
-type Step = 'idle' | 'generating' | 'analyzing' | 'paywalled' | 'builder_locked' | 'error'
+type Step = 'idle' | 'generating' | 'analyzing' | 'paywalled' | 'error'
 
 interface GraphEvent {
   type: string
@@ -79,6 +79,7 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
   const [errorMsg, setErrorMsg] = useState('')
   const [currentNode, setCurrentNode] = useState<string | null>(null)
   const [buyingCredits, setBuyingCredits] = useState(false)
+  const [isFirstPurchase, setIsFirstPurchase] = useState(true)
 
   const formReady =
     input.contact.name.trim().length > 0 &&
@@ -91,13 +92,13 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
 
   const isActive = step === 'generating' || step === 'analyzing'
 
-  async function buyCredits(credits: 1 | 5) {
+  async function buyCredits(tier: 'intro' | 'single' | 'bulk') {
     setBuyingCredits(true)
     try {
       const r = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credits }),
+        body: JSON.stringify({ tier, return_to: '/builder' }),
       })
       if (!r.ok) {
         const { error } = await r.json().catch(() => ({ error: `HTTP ${r.status}` }))
@@ -145,8 +146,9 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
       })
 
       if (r.status === 402) {
-        const { code } = (await r.json().catch(() => ({}))) as { code?: string }
-        setStep(code === 'BUILDER_LOCKED' ? 'builder_locked' : 'paywalled')
+        const body = (await r.json().catch(() => ({}))) as { is_first_purchase?: boolean }
+        setIsFirstPurchase(body.is_first_purchase ?? true)
+        setStep('paywalled')
         return
       }
       if (!r.ok) {
@@ -303,16 +305,7 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
 
       {step === 'paywalled' && (
         <PaywallModal
-          variant="quota"
-          buying={buyingCredits}
-          onBuy={buyCredits}
-          onClose={() => setStep('idle')}
-        />
-      )}
-
-      {step === 'builder_locked' && (
-        <PaywallModal
-          variant="locked"
+          isFirstPurchase={isFirstPurchase}
           buying={buyingCredits}
           onBuy={buyCredits}
           onClose={() => setStep('idle')}
@@ -350,43 +343,51 @@ export function BuilderFlow({ sourceResumeId = null }: BuilderFlowProps) {
 }
 
 interface PaywallModalProps {
-  variant: 'quota' | 'locked'
+  isFirstPurchase: boolean
   buying: boolean
-  onBuy: (credits: 1 | 5) => void
+  onBuy: (tier: 'intro' | 'single' | 'bulk') => void
   onClose: () => void
 }
 
-function PaywallModal({ variant, buying, onBuy, onClose }: PaywallModalProps) {
+function PaywallModal({ isFirstPurchase, buying, onBuy, onClose }: PaywallModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-6">
       <div className="max-w-md w-full rounded-2xl bg-paper p-8 shadow-xl">
         <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-driftwood mb-2">
-          {variant === 'locked' ? 'Builder locked' : 'Out of credits'}
+          {isFirstPurchase ? 'Get started' : 'Out of credits'}
         </p>
         <h2 className="font-serif text-2xl text-ink mb-3">
-          {variant === 'locked'
-            ? 'Your free credit is analyzer-only'
-            : 'Buy credits to keep going'}
+          {isFirstPurchase ? 'Unlock your first build' : 'Buy credits to keep going'}
         </h2>
         <p className="text-sm text-driftwood leading-relaxed mb-6">
-          {variant === 'locked'
-            ? 'The Activities Builder is a paid feature. Purchase a credit pack to unlock it — credits work for both the builder and the analyzer.'
+          {isFirstPurchase
+            ? 'One-time $4 to generate your resume and score it through 4 frontier LLMs. Credits never expire.'
             : 'Each build is 1 credit. Pick a pack:'}
         </p>
         <div className="flex flex-col sm:flex-row gap-3">
+          {isFirstPurchase ? (
+            <button
+              onClick={() => onBuy('intro')}
+              disabled={buying}
+              className="flex-1 rounded-full bg-marigold px-5 py-3 text-sm font-medium text-ink hover:brightness-105 disabled:opacity-40 transition-all"
+            >
+              {buying ? '…' : 'Intro — 1 build — $4'}
+            </button>
+          ) : (
+            <button
+              onClick={() => onBuy('single')}
+              disabled={buying}
+              className="flex-1 rounded-full border border-bone bg-vellum/50 px-5 py-3 text-sm font-medium text-ink hover:bg-bone disabled:opacity-40 transition-colors"
+            >
+              {buying ? '…' : '1 decode — $6'}
+            </button>
+          )}
           <button
-            onClick={() => onBuy(1)}
-            disabled={buying}
-            className="flex-1 rounded-full border border-bone bg-vellum/50 px-5 py-3 text-sm font-medium text-ink hover:bg-bone disabled:opacity-40 transition-colors"
-          >
-            {buying ? '…' : '1 decode — $6'}
-          </button>
-          <button
-            onClick={() => onBuy(5)}
+            onClick={() => onBuy('bulk')}
             disabled={buying}
             className="flex-1 rounded-full bg-ink px-5 py-3 text-sm font-medium text-vellum hover:bg-ink/90 disabled:opacity-40 transition-colors"
           >
-            {buying ? '…' : '5 decodes — $15 (save 50%)'}
+            {buying ? '…' : '5 decodes — $15'}
           </button>
         </div>
         <button

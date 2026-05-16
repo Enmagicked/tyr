@@ -10,6 +10,7 @@ import { rewriteBullet } from '@/lib/builder/rewrite'
 import { renderResumeText } from '@/lib/builder/render'
 import type { GeneratedResume } from '@/lib/builder/types'
 import { isAdminEmail } from '@/lib/admin'
+import { checkRateLimit } from '@/lib/ratelimit'
 
 const REWRITE_CAP = 5
 
@@ -39,6 +40,14 @@ async function handleRewrite(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const rl = await checkRateLimit('builder_rewrite', user.id)
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', code: 'RATE_LIMITED', reset: rl.reset },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((rl.reset - Date.now()) / 1000)) } }
+    )
+  }
+
   let body: RewriteRequestBody
   try {
     body = (await request.json()) as RewriteRequestBody
@@ -63,34 +72,76 @@ async function handleRewrite(request: Request) {
     return NextResponse.json({ error: 'Not a builder draft' }, { status: 400 })
   }
   const isAdmin = isAdminEmail(user.email)
-  if (!isAdmin && (resume.builder_rewrites_used as number) >= REWRITE_CAP) {
-    return NextResponse.json(
-      {
-        error: `Rewrite limit reached (${REWRITE_CAP} per draft)`,
-        code: 'REWRITE_LIMIT',
-      },
-      { status: 429 }
-    )
+
+  // Atomic reservation: bump builder_rewrites_used iff currently < cap.
+  // Returns the new count, or NULL if the cap was already reached. Admins
+  // bypass entirely.
+  let newRewritesUsed: number
+  if (isAdmin) {
+    newRewritesUsed = (resume.builder_rewrites_used as number) + 1
+  } else {
+    const { data: bumped, error: rpcError } = await service.rpc('consume_builder_rewrite', {
+      p_resume_id: resumeId,
+      p_cap: REWRITE_CAP,
+    })
+    if (rpcError) {
+      console.error('[builder/rewrite-bullet] consume_builder_rewrite failed:', rpcError)
+      return NextResponse.json({ error: 'Rewrite check failed' }, { status: 500 })
+    }
+    if (bumped === null) {
+      return NextResponse.json(
+        {
+          error: `Rewrite limit reached (${REWRITE_CAP} per draft)`,
+          code: 'REWRITE_LIMIT',
+        },
+        { status: 429 }
+      )
+    }
+    newRewritesUsed = bumped as number
+  }
+
+  async function refundRewriteOnFailure() {
+    if (isAdmin) return
+    // Best-effort decrement. Read-modify-write is fine here — we only ever
+    // bump down by 1, never make a count negative, and races just mean a
+    // user gets back a rewrite they paid for.
+    await service
+      .from('resumes')
+      .update({ builder_rewrites_used: newRewritesUsed - 1 })
+      .eq('id', resumeId)
   }
 
   // Locate the bullet
   const section = generated.sections[sectionIndex]
-  if (!section) return NextResponse.json({ error: 'sectionIndex out of range' }, { status: 400 })
+  if (!section) {
+    await refundRewriteOnFailure()
+    return NextResponse.json({ error: 'sectionIndex out of range' }, { status: 400 })
+  }
   const item = section.items[itemIndex]
-  if (!item) return NextResponse.json({ error: 'itemIndex out of range' }, { status: 400 })
+  if (!item) {
+    await refundRewriteOnFailure()
+    return NextResponse.json({ error: 'itemIndex out of range' }, { status: 400 })
+  }
   const originalBullet = item.bullets[bulletIndex]
   if (typeof originalBullet !== 'string') {
+    await refundRewriteOnFailure()
     return NextResponse.json({ error: 'bulletIndex out of range' }, { status: 400 })
   }
 
   // Rewrite via Claude
-  const newBullet = await rewriteBullet({
-    originalBullet,
-    itemHeader: item.header,
-    targetRole: (resume.target_role as string | null) ?? null,
-    targetJd: (resume.target_jd as string | null) ?? null,
-    isInternship: !!resume.is_internship,
-  })
+  let newBullet: string
+  try {
+    newBullet = await rewriteBullet({
+      originalBullet,
+      itemHeader: item.header,
+      targetRole: (resume.target_role as string | null) ?? null,
+      targetJd: (resume.target_jd as string | null) ?? null,
+      isInternship: !!resume.is_internship,
+    })
+  } catch (err) {
+    await refundRewriteOnFailure()
+    throw err
+  }
 
   // Mutate the generated resume + persist
   const updated: GeneratedResume = {
@@ -112,18 +163,19 @@ async function handleRewrite(request: Request) {
   const rawText = renderResumeText(updated)
 
   const existingBlob = (resume.builder_input as { user_input?: unknown; generated?: unknown } | null) ?? {}
+  // builder_rewrites_used was already atomically bumped by the RPC above;
+  // we only need to persist the new payload here.
   await service
     .from('resumes')
     .update({
       builder_input: { ...existingBlob, generated: updated },
       raw_text: rawText,
-      builder_rewrites_used: (resume.builder_rewrites_used as number) + 1,
     })
     .eq('id', resumeId)
 
   return NextResponse.json({
     bullet: newBullet,
-    rewrites_used: (resume.builder_rewrites_used as number) + 1,
-    rewrites_remaining: REWRITE_CAP - ((resume.builder_rewrites_used as number) + 1),
+    rewrites_used: newRewritesUsed,
+    rewrites_remaining: REWRITE_CAP - newRewritesUsed,
   })
 }

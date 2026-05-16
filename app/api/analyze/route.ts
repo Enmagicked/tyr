@@ -5,6 +5,7 @@ import { broker } from '@/lib/event-broker'
 import { buildAnalysisGraph } from '@/lib/agents'
 import { randomUUID } from 'crypto'
 import { getPostHogClient } from '@/lib/posthog-server'
+import { checkRateLimit } from '@/lib/ratelimit'
 
 export async function POST(request: Request) {
   try {
@@ -25,6 +26,14 @@ async function handleAnalyze(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const rl = await checkRateLimit('analyze', user.id)
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', code: 'RATE_LIMITED', reset: rl.reset },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((rl.reset - Date.now()) / 1000)) } }
+    )
   }
 
   const body = await request.json() as { resumeId?: string }

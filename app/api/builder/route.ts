@@ -2,9 +2,9 @@
 // stores it as a `resumes` row with input_kind='builder'. The caller then
 // POSTs to /api/analyze with the returned resumeId to score it.
 //
-// Credit gate: requires credits_remaining >= 1 AND credits_purchased >= 1
-// (the signup free credit is analyzer-only; builder access requires having
-// purchased credits at least once).
+// Credit gate: requires credits_remaining >= 1. As of the paid-only switch
+// (no more free signup credits), having a credit implies a prior purchase,
+// so the old BUILDER_LOCKED check is redundant.
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -15,6 +15,7 @@ import { renderResumeText } from '@/lib/builder/render'
 import type { BuilderInput } from '@/lib/builder/types'
 import { isAdminEmail } from '@/lib/admin'
 import { loadBuilderSourceContext, buildInsightsAddendum } from '@/lib/builder/source-context'
+import { checkRateLimit } from '@/lib/ratelimit'
 
 // Generation + DB writes can take 20-40s wall-clock; Vercel's default
 // route timeout is 10s on Hobby and the browser surfaces it as a
@@ -52,47 +53,62 @@ async function handleBuilder(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const service = createServiceClient()
-
-  // Credit gate: builder requires both credits_remaining AND a prior purchase.
-  // The free signup credit is analyzer-only. Admin emails skip both checks.
-  const { data: candidate } = await service
-    .from('candidates')
-    .select('credits_remaining, credits_purchased')
-    .eq('id', user.id)
-    .single()
-
   const isAdmin = isAdminEmail(user.email)
+  const userId = user.id
 
+  const rl = await checkRateLimit('builder', userId)
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', code: 'RATE_LIMITED', reset: rl.reset },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((rl.reset - Date.now()) / 1000)) } }
+    )
+  }
+
+  // Atomic credit reservation. Refunded on any failure below.
+  let creditReserved = false
   if (!isAdmin) {
-    if (!candidate || (candidate.credits_remaining as number) <= 0) {
+    const { data: newRemaining, error: rpcError } = await service.rpc('consume_credit', {
+      p_user_id: user.id,
+    })
+    if (rpcError) {
+      console.error('[builder] consume_credit failed:', rpcError)
+      return NextResponse.json({ error: 'Credit check failed' }, { status: 500 })
+    }
+    if (newRemaining === null) {
+      const { data: candidate } = await service
+        .from('candidates')
+        .select('credits_purchased')
+        .eq('id', user.id)
+        .single()
+      const isFirstPurchase = ((candidate?.credits_purchased as number | undefined) ?? 0) === 0
       return NextResponse.json(
-        { error: 'No credits remaining', code: 'QUOTA_EXCEEDED' },
+        { error: 'No credits remaining', code: 'QUOTA_EXCEEDED', is_first_purchase: isFirstPurchase },
         { status: 402 }
       )
     }
-    if ((candidate.credits_purchased as number) <= 0) {
-      return NextResponse.json(
-        {
-          error: 'The builder requires purchased credits',
-          code: 'BUILDER_LOCKED',
-          hint: 'Your signup free credit is for the analyzer only. Purchase a credit pack to unlock the builder.',
-        },
-        { status: 402 }
-      )
-    }
+    creditReserved = true
+  }
+
+  async function refundOnFailure() {
+    if (!creditReserved) return
+    const { error } = await service.rpc('refund_credit', { p_user_id: userId })
+    if (error) console.error('[builder] refund_credit failed:', error)
   }
 
   let body: BuilderRequestBody
   try {
     body = (await request.json()) as BuilderRequestBody
   } catch {
+    await refundOnFailure()
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   if (!body.input || typeof body.input !== 'object') {
+    await refundOnFailure()
     return NextResponse.json({ error: 'input is required' }, { status: 400 })
   }
   if (!body.input.contact?.name || !body.input.contact?.email) {
+    await refundOnFailure()
     return NextResponse.json(
       { error: 'contact.name and contact.email are required' },
       { status: 400 }
@@ -100,6 +116,7 @@ async function handleBuilder(request: Request) {
   }
   const targetRole = (body.target_role ?? '').trim()
   if (targetRole.length < 2 || targetRole.length > 80) {
+    await refundOnFailure()
     return NextResponse.json(
       { error: 'target_role must be 2-80 characters' },
       { status: 400 }
@@ -108,6 +125,7 @@ async function handleBuilder(request: Request) {
   const targetCompany = (body.target_company ?? '').trim()
   const targetJd = (body.target_jd ?? '').trim()
   if (targetJd.length > 10_000) {
+    await refundOnFailure()
     return NextResponse.json(
       { error: 'target_jd must be under 10,000 characters' },
       { status: 400 }
@@ -126,16 +144,22 @@ async function handleBuilder(request: Request) {
   }
 
   // Generate via Claude
-  const generated = await generateResume(
-    {
-      input: body.input,
-      targetRole,
-      targetCompany: targetCompany || null,
-      targetJd: targetJd || null,
-      isInternship,
-    },
-    insightsAddendum
-  )
+  let generated
+  try {
+    generated = await generateResume(
+      {
+        input: body.input,
+        targetRole,
+        targetCompany: targetCompany || null,
+        targetJd: targetJd || null,
+        isInternship,
+      },
+      insightsAddendum
+    )
+  } catch (err) {
+    await refundOnFailure()
+    throw err
+  }
 
   const rawText = renderResumeText(generated)
 
@@ -152,6 +176,7 @@ async function handleBuilder(request: Request) {
       upsert: false,
     })
   if (storageError) {
+    await refundOnFailure()
     console.error('[builder] storage error:', storageError)
     return NextResponse.json(
       {
@@ -180,19 +205,11 @@ async function handleBuilder(request: Request) {
     .select()
     .single()
   if (dbError || !resume) {
+    await refundOnFailure()
     console.error('[builder] db error:', dbError)
     return NextResponse.json({ error: 'Failed to save generated resume' }, { status: 500 })
   }
-
-  if (!isAdmin && candidate) {
-    await service
-      .from('candidates')
-      .update({
-        credits_remaining: (candidate.credits_remaining as number) - 1,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', user.id)
-  }
+  // Credit was already atomically consumed via consume_credit() above.
 
   const posthog = getPostHogClient()
   posthog.capture({

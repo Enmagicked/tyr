@@ -5,17 +5,22 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import posthog from 'posthog-js'
 
-export function AccountBuyCredits() {
-  const [loading, setLoading] = useState<1 | 5 | null>(null)
+interface AccountBuyCreditsProps {
+  creditsPurchased: number
+}
 
-  async function buy(credits: 1 | 5) {
-    setLoading(credits)
-    posthog.capture('checkout_started', { credit_count: credits })
+export function AccountBuyCredits({ creditsPurchased }: AccountBuyCreditsProps) {
+  const [loading, setLoading] = useState<'intro' | 'single' | 'bulk' | null>(null)
+  const isFirstPurchase = creditsPurchased === 0
+
+  async function buy(tier: 'intro' | 'single' | 'bulk') {
+    setLoading(tier)
+    posthog.capture('checkout_started', { tier })
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credits }),
+        body: JSON.stringify({ tier, return_to: '/account' }),
       })
       const { url, error } = await res.json()
       if (!res.ok || !url) throw new Error(error ?? 'Could not start checkout')
@@ -28,19 +33,29 @@ export function AccountBuyCredits() {
 
   return (
     <div className="flex gap-2 flex-shrink-0">
+      {isFirstPurchase ? (
+        <button
+          onClick={() => buy('intro')}
+          disabled={loading !== null}
+          className="text-[13px] font-medium px-4 py-2 rounded-full bg-marigold text-ink hover:brightness-105 disabled:opacity-50 transition-all"
+        >
+          {loading === 'intro' ? '…' : 'Intro · 1 decode · $4'}
+        </button>
+      ) : (
+        <button
+          onClick={() => buy('single')}
+          disabled={loading !== null}
+          className="text-[13px] font-medium px-4 py-2 rounded-full border border-bone bg-vellum/50 text-ink hover:bg-bone disabled:opacity-50 transition-colors"
+        >
+          {loading === 'single' ? '…' : '1 decode · $6'}
+        </button>
+      )}
       <button
-        onClick={() => buy(1)}
-        disabled={loading !== null}
-        className="text-[13px] font-medium px-4 py-2 rounded-full border border-bone bg-vellum/50 text-ink hover:bg-bone disabled:opacity-50 transition-colors"
-      >
-        {loading === 1 ? '…' : '1 decode · $6'}
-      </button>
-      <button
-        onClick={() => buy(5)}
+        onClick={() => buy('bulk')}
         disabled={loading !== null}
         className="text-[13px] font-medium px-4 py-2 rounded-full bg-ink text-vellum hover:bg-ink/90 disabled:opacity-50 transition-colors"
       >
-        {loading === 5 ? '…' : '5 decodes · $15'}
+        {loading === 'bulk' ? '…' : '5 decodes · $15'}
       </button>
     </div>
   )

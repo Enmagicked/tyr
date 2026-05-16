@@ -103,7 +103,7 @@ export default async function AccountPage() {
                 <p className="text-[11px] text-sage mt-0.5">Full report history unlocked</p>
               )}
             </div>
-            <AccountBuyCredits />
+            <AccountBuyCredits creditsPurchased={creditsPurchased} />
           </div>
         </div>
 

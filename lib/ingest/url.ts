@@ -16,6 +16,7 @@
 import { JSDOM, VirtualConsole } from 'jsdom'
 import { Readability } from '@mozilla/readability'
 import { lookup } from 'node:dns/promises'
+import { Agent, fetch as undiciFetch } from 'undici'
 
 // Limits — chosen to fit a Vercel function runtime budget. Adjust if a
 // legitimate URL fails the guard for a defensible reason.
@@ -104,30 +105,27 @@ export function validateUrl(input: string): URL {
   return url
 }
 
-// Resolve hostname to an IP and verify it's not in a private range. This is
-// the second SSRF gate (after string-pattern checks above) — DNS rebinding
-// attacks try to slip past hostname checks by resolving to a public IP at
-// validation time and a private IP at fetch time. Mitigation: re-resolve and
-// check before fetch. Here we resolve once and trust fetch() to reuse the
-// host header — perfect would be to dial the IP directly, but undici/fetch
-// doesn't expose that cleanly. Belt-and-suspenders: most useful attacks
-// (file://, raw IP literals, localhost) are blocked by validateUrl above.
-async function ensurePublicHost(hostname: string): Promise<void> {
-  // Numeric IP literals are checked directly without DNS
+// Resolve hostname to an IP and verify it's not in a private range. Returns
+// the first non-private address found so the caller can pin the connection
+// to that exact IP — closing the DNS rebinding gap where fetch() would
+// otherwise re-resolve at connect time and accept a freshly-poisoned reply.
+async function resolveToPublicIp(hostname: string): Promise<{ address: string; family: 4 | 6 }> {
+  // Numeric IPv4 literal — validate directly, no DNS.
   if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
     if (isPrivateIpv4(hostname)) {
       throw new UrlIngestError('URL resolves to a private host.')
     }
-    return
+    return { address: hostname, family: 4 }
   }
-  if (hostname.includes(':') && !hostname.includes('.')) {
-    // Likely IPv6
-    if (isPrivateIpv6(hostname.replace(/^\[|\]$/g, ''))) {
+  // Bracketed or bare IPv6 literal.
+  const v6 = hostname.replace(/^\[|\]$/g, '')
+  if (v6.includes(':') && !v6.includes('.')) {
+    if (isPrivateIpv6(v6)) {
       throw new UrlIngestError('URL resolves to a private host.')
     }
-    return
+    return { address: v6, family: 6 }
   }
-  // Hostname → DNS lookup. Both v4 and v6 records.
+  // Hostname → DNS lookup; check ALL records, return the first public one.
   let addrs: { address: string; family: number }[]
   try {
     addrs = await lookup(hostname, { all: true })
@@ -142,57 +140,100 @@ async function ensurePublicHost(hostname: string): Promise<void> {
       throw new UrlIngestError('URL resolves to a private host.')
     }
   }
+  const first = addrs[0]
+  if (!first) {
+    throw new UrlIngestError(`Could not resolve ${hostname}.`)
+  }
+  return { address: first.address, family: first.family === 6 ? 6 : 4 }
 }
 
-async function fetchHtml(url: URL): Promise<string> {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
-  let response: Response
-  try {
-    response = await fetch(url.toString(), {
-      signal: controller.signal,
-      redirect: 'follow',
-      headers: {
-        // Identify ourselves so polite servers can rate-limit / log; many
-        // sites refuse default node fetches.
-        'User-Agent': 'tyr-resume-decoder/1.0 (+https://tyr-mauve.vercel.app)',
-        Accept: 'text/html,application/xhtml+xml',
-      },
-    })
-  } catch (err) {
-    clearTimeout(timeout)
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new UrlIngestError('Fetch timed out after 10 seconds.', 504)
-    }
-    throw new UrlIngestError(
-      `Could not reach ${url.hostname}: ${err instanceof Error ? err.message : 'unknown error'}`
-    )
-  }
-  clearTimeout(timeout)
+// Back-compat shim for tests that imported the old name.
+async function ensurePublicHost(hostname: string): Promise<void> {
+  await resolveToPublicIp(hostname)
+}
 
-  if (!response.ok) {
-    throw new UrlIngestError(`URL returned HTTP ${response.status}.`, 502)
+// Pin the TCP connection to a pre-validated IP via undici's `connect.lookup`
+// hook. Closes the DNS rebinding gap: even if the hostname re-resolves to a
+// private IP between validation and connect, we feed undici the cached
+// public IP. Returns a fresh dispatcher per request so the IP doesn't leak.
+function pinnedDispatcher(ip: { address: string; family: 4 | 6 }) {
+  return new Agent({
+    connect: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      lookup: ((_hostname: string, _opts: unknown, cb: any) =>
+        cb(null, ip.address, ip.family)) as never,
+    },
+  })
+}
+
+async function fetchHtml(initialUrl: URL): Promise<string> {
+  let url = initialUrl
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    // Re-validate every hop. validateUrl re-runs scheme + userinfo +
+    // localhost checks; resolveToPublicIp re-runs DNS + private-range checks.
+    if (hop > 0) {
+      url = validateUrl(url.toString())
+    }
+    const ip = await resolveToPublicIp(url.hostname)
+    const dispatcher = pinnedDispatcher(ip)
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+    let response: Awaited<ReturnType<typeof undiciFetch>>
+    try {
+      response = await undiciFetch(url.toString(), {
+        signal: controller.signal,
+        redirect: 'manual',
+        dispatcher,
+        headers: {
+          'User-Agent': 'tyr-resume-decoder/1.0 (+https://usetyr.com)',
+          Accept: 'text/html,application/xhtml+xml',
+        },
+      })
+    } catch (err) {
+      clearTimeout(timeout)
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new UrlIngestError('Fetch timed out after 10 seconds.', 504)
+      }
+      throw new UrlIngestError(
+        `Could not reach ${url.hostname}: ${err instanceof Error ? err.message : 'unknown error'}`
+      )
+    }
+    clearTimeout(timeout)
+
+    // Manual redirect follow — re-validate the Location header before the
+    // next hop. Without this, a server could 302 us to a private IP.
+    if (response.status >= 300 && response.status < 400) {
+      const loc = response.headers.get('location')
+      if (!loc) {
+        throw new UrlIngestError(`Redirect ${response.status} with no Location header.`, 502)
+      }
+      url = new URL(loc, url)
+      continue
+    }
+
+    if (!response.ok) {
+      throw new UrlIngestError(`URL returned HTTP ${response.status}.`, 502)
+    }
+    const contentType = (response.headers.get('content-type') ?? '').toLowerCase()
+    if (
+      !contentType.startsWith('text/html') &&
+      !contentType.startsWith('application/xhtml') &&
+      !contentType.startsWith('text/plain')
+    ) {
+      throw new UrlIngestError(
+        `URL returned ${contentType || 'unknown content-type'}. Expected HTML.`
+      )
+    }
+    const buf = await response.arrayBuffer()
+    if (buf.byteLength > MAX_BODY_BYTES) {
+      throw new UrlIngestError(
+        `URL body too large (${(buf.byteLength / 1024 / 1024).toFixed(1)} MB > 5 MB cap).`
+      )
+    }
+    return new TextDecoder('utf-8').decode(buf)
   }
-  // Verify content-type is HTML or text — we're not Readability-extracting
-  // PDFs or images via the URL path.
-  const contentType = (response.headers.get('content-type') ?? '').toLowerCase()
-  if (
-    !contentType.startsWith('text/html') &&
-    !contentType.startsWith('application/xhtml') &&
-    !contentType.startsWith('text/plain')
-  ) {
-    throw new UrlIngestError(
-      `URL returned ${contentType || 'unknown content-type'}. Expected HTML.`
-    )
-  }
-  // Body cap — read as ArrayBuffer to count bytes precisely.
-  const buf = await response.arrayBuffer()
-  if (buf.byteLength > MAX_BODY_BYTES) {
-    throw new UrlIngestError(
-      `URL body too large (${(buf.byteLength / 1024 / 1024).toFixed(1)} MB > 5 MB cap).`
-    )
-  }
-  return new TextDecoder('utf-8').decode(buf)
+  throw new UrlIngestError(`Too many redirects (> ${MAX_REDIRECTS}).`, 502)
 }
 
 export interface UrlIngestResult {
@@ -203,7 +244,7 @@ export interface UrlIngestResult {
 
 export async function ingestUrl(input: string): Promise<UrlIngestResult> {
   const url = validateUrl(input)
-  await ensurePublicHost(url.hostname)
+  // fetchHtml validates + resolves at every hop; no need to pre-check here.
   const html = await fetchHtml(url)
 
   // jsdom's default console spews CSS/script errors for any real-world page;

@@ -5,6 +5,7 @@ import { extractTextFromPDF } from '@/lib/extract-text'
 import { ocrDocument } from '@/lib/ocr'
 import { getPostHogClient } from '@/lib/posthog-server'
 import { isAdminEmail } from '@/lib/admin'
+import { checkRateLimit } from '@/lib/ratelimit'
 
 // Note: ingestUrl + UrlIngestError are LAZY-loaded inside ingestFromUrl()
 // below. jsdom + Mozilla Readability are heavy (10+ MB) and can fail at
@@ -59,24 +60,56 @@ async function handleUpload(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Check credits before doing any work
   const service = createServiceClient()
-  const { data: candidate } = await service
-    .from('candidates')
-    .select('credits_remaining')
-    .eq('id', user.id)
-    .single()
-
   const isAdmin = isAdminEmail(user.email)
+  const userId = user.id
 
-  if (!isAdmin && (!candidate || (candidate.credits_remaining as number) <= 0)) {
-    const posthog = getPostHogClient()
-    posthog.capture({ distinctId: user.id, event: 'quota_exhausted' })
-    await posthog.shutdown()
+  const rl = await checkRateLimit('upload', userId)
+  if (!rl.ok) {
     return NextResponse.json(
-      { error: 'No credits remaining', code: 'QUOTA_EXCEEDED' },
-      { status: 402 }
+      { error: 'Rate limit exceeded', code: 'RATE_LIMITED', reset: rl.reset },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((rl.reset - Date.now()) / 1000)) } }
     )
+  }
+
+  // Atomic credit reservation. Either we get a row and credits_remaining
+  // decremented in one SQL statement, or we get NULL (no credits). Admins
+  // bypass entirely. Refunded via refund_credit() if downstream work fails.
+  let creditReserved = false
+  if (!isAdmin) {
+    const { data: newRemaining, error: rpcError } = await service.rpc('consume_credit', {
+      p_user_id: user.id,
+    })
+    if (rpcError) {
+      console.error('[upload] consume_credit failed:', rpcError)
+      return NextResponse.json({ error: 'Credit check failed' }, { status: 500 })
+    }
+    if (newRemaining === null) {
+      // Look up purchase history so the paywall can decide whether to
+      // show the $4 intro pack (first-purchase only).
+      const { data: candidate } = await service
+        .from('candidates')
+        .select('credits_purchased')
+        .eq('id', user.id)
+        .single()
+      const isFirstPurchase = ((candidate?.credits_purchased as number | undefined) ?? 0) === 0
+      const posthog = getPostHogClient()
+      posthog.capture({ distinctId: user.id, event: 'quota_exhausted' })
+      await posthog.shutdown()
+      return NextResponse.json(
+        { error: 'No credits remaining', code: 'QUOTA_EXCEEDED', is_first_purchase: isFirstPurchase },
+        { status: 402 }
+      )
+    }
+    creditReserved = true
+  }
+
+  // From here on, if we return early due to a failure, refund the reserved
+  // credit. Helper closes over service + user + creditReserved.
+  async function refundOnFailure() {
+    if (!creditReserved) return
+    const { error } = await service.rpc('refund_credit', { p_user_id: userId })
+    if (error) console.error('[upload] refund_credit failed:', error)
   }
 
   const formData = await request.formData()
@@ -93,18 +126,21 @@ async function handleUpload(request: Request) {
   const isInternship = formData.get('is_internship') === 'true'
 
   if (targetRole.length < 2 || targetRole.length > 80) {
+    await refundOnFailure()
     return NextResponse.json(
       { error: 'target_role must be 2-80 characters' },
       { status: 400 }
     )
   }
   if (targetCompany.length > 0 && (targetCompany.length < 2 || targetCompany.length > 80)) {
+    await refundOnFailure()
     return NextResponse.json(
       { error: 'target_company must be 2-80 characters when provided' },
       { status: 400 }
     )
   }
   if (targetJd.length > 0 && (targetJd.length < 2 || targetJd.length > 10_000)) {
+    await refundOnFailure()
     return NextResponse.json(
       { error: 'target_jd must be 2-10,000 characters when provided' },
       { status: 400 }
@@ -129,6 +165,7 @@ async function handleUpload(request: Request) {
       ingest = await ingestFromUrl(formData)
     }
   } catch (err) {
+    await refundOnFailure()
     if (err instanceof IngestError) {
       return NextResponse.json(
         { error: err.message, detail: err.detail, hint: err.hint },
@@ -153,6 +190,7 @@ async function handleUpload(request: Request) {
   ingest.raw_text = stripNulls(ingest.raw_text)
 
   if (!ingest.raw_text || ingest.raw_text.trim().length < MIN_RAW_TEXT_CHARS) {
+    await refundOnFailure()
     return NextResponse.json(
       {
         error: 'No usable text could be extracted',
@@ -175,11 +213,14 @@ async function handleUpload(request: Request) {
       upsert: false,
     })
   if (storageError) {
+    await refundOnFailure()
     console.error('[upload] storage error:', storageError)
     return NextResponse.json({ error: 'Failed to store file' }, { status: 500 })
   }
 
-  const isPriority = isAdmin || (candidate ? (candidate.credits_remaining as number) > 0 : false)
+  // is_priority = true whenever the user paid (or is admin). Since we've
+  // already reserved a credit above, having gotten this far implies paid.
+  const isPriority = isAdmin || creditReserved
   const { data: resume, error: dbError } = await service
     .from('resumes')
     .insert({
@@ -198,6 +239,7 @@ async function handleUpload(request: Request) {
     .single()
 
   if (dbError || !resume) {
+    await refundOnFailure()
     console.error('[upload] db error:', dbError)
     const message = dbError?.message ?? 'unknown'
     const details = dbError?.details ?? ''
@@ -211,17 +253,8 @@ async function handleUpload(request: Request) {
       { status: 500 }
     )
   }
-
-  // Decrement the credit that was checked above (admins bypass).
-  if (!isAdmin && candidate) {
-    await service
-      .from('candidates')
-      .update({
-        credits_remaining: (candidate.credits_remaining as number) - 1,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', user.id)
-  }
+  // Credit was already atomically consumed via consume_credit() above —
+  // no trailing decrement needed.
 
   const posthog = getPostHogClient()
   posthog.capture({

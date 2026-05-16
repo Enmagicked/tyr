@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { loadBuilderSourceContext } from '@/lib/builder/source-context'
+import { checkRateLimit } from '@/lib/ratelimit'
 
 // Haiku extraction usually 1-3s, but cold starts + Anthropic queueing
 // can spike to 20s+. Headroom for both, with an internal Haiku timeout
@@ -19,6 +20,14 @@ export async function GET(request: Request) {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const rl = await checkRateLimit('builder_prefill', user.id)
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', code: 'RATE_LIMITED', reset: rl.reset },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil((rl.reset - Date.now()) / 1000)) } }
+      )
+    }
 
     const url = new URL(request.url)
     const resumeId = url.searchParams.get('resumeId')

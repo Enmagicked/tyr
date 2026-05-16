@@ -14,7 +14,7 @@ function getClient(): Anthropic {
   return _client
 }
 
-const CACHE_NAMESPACE = 'builder_rewrite:v1'
+const CACHE_NAMESPACE = 'builder_rewrite:v2'
 
 function rewriteCacheKey(args: BuildRewritePromptArgs): string {
   const rendered = buildRewritePrompt(args)

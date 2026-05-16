@@ -69,6 +69,7 @@ export function UploadFlow() {
   const [isDragging, setIsDragging] = useState(false)
   const [currentNode, setCurrentNode] = useState<string | null>(null)
   const [buyingCredits, setBuyingCredits] = useState(false)
+  const [isFirstPurchase, setIsFirstPurchase] = useState(true)
 
   const targetReady = isValidTarget(target)
   const isActive = step !== 'idle' && step !== 'error' && step !== 'paywalled'
@@ -115,6 +116,8 @@ export function UploadFlow() {
 
       const uploadRes = await fetch('/api/upload', { method: 'POST', body: uploadForm })
       if (uploadRes.status === 402) {
+        const body = await uploadRes.json().catch(() => ({}))
+        setIsFirstPurchase(body.is_first_purchase ?? true)
         setStep('paywalled')
         return
       }
@@ -187,14 +190,14 @@ export function UploadFlow() {
     if (file) submit(file)
   }
 
-  async function buyCredits(creditCount: 1 | 5) {
+  async function buyCredits(tier: 'intro' | 'single' | 'bulk') {
     setBuyingCredits(true)
-    posthog.capture('checkout_started', { credit_count: creditCount })
+    posthog.capture('checkout_started', { tier })
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credits: creditCount }),
+        body: JSON.stringify({ tier, return_to: '/upload' }),
       })
       const { url, error } = await res.json()
       if (!res.ok || !url) throw new Error(error ?? 'Could not start checkout')
@@ -245,25 +248,39 @@ export function UploadFlow() {
       {step === 'paywalled' ? (
         <div className="flex flex-col gap-5 rounded-2xl border border-bone bg-paper/60 p-8 text-center">
           <div>
-            <p className="font-serif text-2xl text-ink mb-1">You&rsquo;re out of credits</p>
+            <p className="font-serif text-2xl text-ink mb-1">
+              {isFirstPurchase ? 'Unlock your first decode' : 'You’re out of credits'}
+            </p>
             <p className="text-sm text-driftwood">
-              Buy a pack to keep decoding. Credits never expire.
+              {isFirstPurchase
+                ? 'One-time $4 to see how 4 frontier LLMs read your resume. Credits never expire.'
+                : 'Buy a pack to keep decoding. Credits never expire.'}
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            {isFirstPurchase ? (
+              <button
+                onClick={() => buyCredits('intro')}
+                disabled={buyingCredits}
+                className="flex-1 rounded-full bg-marigold px-5 py-3 text-sm font-medium text-ink hover:brightness-105 disabled:opacity-40 transition-all"
+              >
+                {buyingCredits ? '…' : 'Intro — 1 decode — $4'}
+              </button>
+            ) : (
+              <button
+                onClick={() => buyCredits('single')}
+                disabled={buyingCredits}
+                className="flex-1 rounded-full border border-bone bg-vellum/50 px-5 py-3 text-sm font-medium text-ink hover:bg-bone disabled:opacity-40 transition-colors"
+              >
+                {buyingCredits ? '…' : '1 decode — $6'}
+              </button>
+            )}
             <button
-              onClick={() => buyCredits(1)}
-              disabled={buyingCredits}
-              className="flex-1 rounded-full border border-bone bg-vellum/50 px-5 py-3 text-sm font-medium text-ink hover:bg-bone disabled:opacity-40 transition-colors"
-            >
-              {buyingCredits ? '…' : '1 decode — $6'}
-            </button>
-            <button
-              onClick={() => buyCredits(5)}
+              onClick={() => buyCredits('bulk')}
               disabled={buyingCredits}
               className="flex-1 rounded-full bg-ink px-5 py-3 text-sm font-medium text-vellum hover:bg-ink/90 disabled:opacity-40 transition-colors"
             >
-              {buyingCredits ? '…' : '5 decodes — $15 (save 50%)'}
+              {buyingCredits ? '…' : '5 decodes — $15'}
             </button>
           </div>
           <button

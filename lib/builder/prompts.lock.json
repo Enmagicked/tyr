@@ -1,9 +1,9 @@
 {
-  "version": "v1",
-  "comment": "SHA-256 (truncated to 16 hex chars) of buildGenerationPrompt() + buildRewritePrompt() + BUILDER_SYSTEM_PROMPT rendered against SENTINEL_*_ARGS in lib/builder/prompts.ts. Run npm test (lib/builder/__tests__/prompts.test.ts) — it asserts live hashes equal these. When the prompt template intentionally changes: (1) regenerate via the failing test message, (2) bump `builder:vN → vN+1` in lib/builder/generate.ts (or `builder_rewrite:vN` if only rewrite changed) so stale cached completions don't pollute new prompts.",
+  "version": "v2",
+  "comment": "SHA-256 (truncated to 16 hex chars) of buildGenerationPrompt() + buildRewritePrompt() + BUILDER_SYSTEM_PROMPT rendered against SENTINEL_*_ARGS in lib/builder/prompts.ts. Run npm test (lib/builder/__tests__/prompts.test.ts) — it asserts live hashes equal these. When the prompt template intentionally changes: (1) regenerate via the failing test message, (2) bump `builder:vN → vN+1` in lib/builder/generate.ts (or `builder_rewrite:vN` if only rewrite changed) so stale cached completions don't pollute new prompts. v2 = added prompt-injection defense (user_input/job_description delimiters + system-prompt instruction-vs-data paragraph).",
   "hashes": {
-    "generation": "ae98b1b3d2f0bc32",
-    "rewrite": "c1f655f716baa207",
-    "system": "d02e4589498dcbad"
+    "generation": "366d52abaeda1579",
+    "rewrite": "ffa858d2278923d8",
+    "system": "24fbb3ce55ad9e7b"
   }
 }

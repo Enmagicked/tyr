@@ -11,21 +11,40 @@ export function getStripe(): Stripe {
   return _stripe
 }
 
-// Credit packs available for purchase.
-// Price IDs are created in the Stripe Dashboard and stored in env vars.
+// Credit packs available for purchase. Price IDs live in Vercel env vars.
+//
+// `firstPurchaseOnly: true` means the pack is only offered when the user
+// has never bought before (candidates.credits_purchased = 0). The checkout
+// route enforces this server-side; the UI hides the pack for repeat buyers.
 export const CREDIT_PACKS = [
+  {
+    credits: 1,
+    label: 'Intro · 1 decode',
+    price: '$4',
+    priceEnvKey: 'STRIPE_PRICE_INTRO',
+    firstPurchaseOnly: true,
+    tier: 'intro',
+  },
   {
     credits: 1,
     label: '1 decode',
     price: '$6',
     priceEnvKey: 'STRIPE_PRICE_1_CREDIT',
+    firstPurchaseOnly: false,
+    tier: 'single',
   },
   {
     credits: 5,
     label: '5 decodes',
     price: '$15',
     priceEnvKey: 'STRIPE_PRICE_5_CREDITS',
+    firstPurchaseOnly: false,
+    tier: 'bulk',
   },
 ] as const
 
-export type CreditPackCredits = (typeof CREDIT_PACKS)[number]['credits']
+export type CreditPackTier = (typeof CREDIT_PACKS)[number]['tier']
+
+export function findPackByTier(tier: string): (typeof CREDIT_PACKS)[number] | undefined {
+  return CREDIT_PACKS.find((p) => p.tier === tier)
+}

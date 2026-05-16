@@ -22,7 +22,7 @@ function getClient(): Anthropic {
 }
 
 // Cache namespace — bump on prompt template change (see prompts.lock.json).
-const CACHE_NAMESPACE = 'builder:v1'
+const CACHE_NAMESPACE = 'builder:v2'
 
 function generationCacheKey(args: BuildGenPromptArgs): string {
   const rendered = buildGenerationPrompt(args)
