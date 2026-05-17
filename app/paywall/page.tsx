@@ -51,18 +51,20 @@ export default async function PaywallPage({ searchParams }: PageProps) {
         <h1 className="font-serif text-4xl md:text-5xl text-ink leading-[1.06] tracking-[-0.026em] text-center mb-4">
           $4 to see how AI <em className="italic text-thistle">actually</em> reads your resume.
         </h1>
-        <p className="text-driftwood text-center max-w-lg mx-auto leading-[1.72] mb-10">
+        <p className="text-driftwood text-center max-w-lg mx-auto leading-[1.72] mb-8">
           Four frontier LLMs and three ATS parsers, scoring your resume in parallel.
           You get the gaps the recruiter-AI sees — and the bullets to fix.
         </p>
 
-        <PaywallButtons
-          isAuthed={isAuthed}
-          isFirstPurchase={isFirstPurchase}
-          returnTo={returnTo}
-        />
-
         <FounderNote />
+
+        <div className="mt-10">
+          <PaywallButtons
+            isAuthed={isAuthed}
+            isFirstPurchase={isFirstPurchase}
+            returnTo={returnTo}
+          />
+        </div>
 
         <p className="mt-10 text-center text-[12px] text-driftwood/70">
           Credits never expire. One credit = one full report. Refunds within 7 days, no questions asked.
@@ -75,7 +77,7 @@ export default async function PaywallPage({ searchParams }: PageProps) {
 
 function FounderNote() {
   return (
-    <section className="mt-14 mx-auto max-w-xl rounded-2xl border border-thistle/25 bg-paper px-7 py-8 shadow-[0_2px_24px_rgba(132,111,156,0.08)]">
+    <section className="mx-auto max-w-xl rounded-2xl border border-thistle/25 bg-paper px-7 py-8 shadow-[0_2px_24px_rgba(132,111,156,0.08)]">
       <div className="flex items-center gap-3 mb-4">
         <div className="h-10 w-10 rounded-full bg-thistle/15 flex items-center justify-center font-serif text-[15px] text-thistle">
           J
@@ -94,8 +96,9 @@ function FounderNote() {
           wrong, and it&rsquo;s happening at scale.
         </p>
         <p>
-          $4 is the floor I could get to while keeping the lights on (the LLMs aren&rsquo;t
-          free). I&rsquo;d rather you actually try it than scroll past.
+          Our mathematical algorithm catches the AI-readability gaps other tools miss —
+          the exact gaps that get qualified candidates auto-rejected. You will land
+          more interviews, guaranteed: if it doesn&rsquo;t help, 7-day refund, no questions.
         </p>
       </div>
     </section>
