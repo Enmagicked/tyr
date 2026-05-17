@@ -1,5 +1,4 @@
 import { Context } from '@/lib/graph'
-import { parseWithAffinda } from '@/lib/parsers/affinda'
 import { parseWithOpenResume } from '@/lib/parsers/openresume'
 import { parseWithNaive } from '@/lib/parsers/naive'
 import { ParseResult } from '@/types'
@@ -7,11 +6,6 @@ import { LoadResumeResult } from './load-resume'
 
 function resume(ctx: Context): LoadResumeResult {
   return ctx.load_resume as LoadResumeResult
-}
-
-export async function parseAffinda(ctx: Context) {
-  const { file_buffer, file_name } = resume(ctx)
-  return parseWithAffinda(file_buffer, file_name)
 }
 
 export async function parseOpenResume(ctx: Context) {
@@ -24,7 +18,7 @@ export async function parseNaive(ctx: Context) {
 
 // Aggregates whatever parsers succeeded — partial results are better than none.
 export async function synthesizeParse(ctx: Context): Promise<{ results: ParseResult[]; count: number }> {
-  const results = (['parse_affinda', 'parse_openresume', 'parse_naive'] as const)
+  const results = (['parse_openresume', 'parse_naive', 'parse_llm'] as const)
     .map((name) => ctx[name] as ParseResult | undefined)
     .filter((r): r is ParseResult => r !== undefined)
 

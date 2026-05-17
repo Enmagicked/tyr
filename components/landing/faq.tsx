@@ -10,7 +10,7 @@ const ITEMS = [
   },
   {
     q: 'How does the ATS analysis work?',
-    a: "Three independent parsers run in parallel — Affinda's commercial NER, the open-source OpenResume engine, and our own deterministic extractor. We normalize their outputs into a canonical schema and score where they diverge. High parser disagreement is itself a finding: it predicts that real-world ATSes will read your resume inconsistently.",
+    a: "Three independent parsers run in parallel — the open-source OpenResume engine, our own deterministic extractor, and a Claude-Haiku canonical extractor. We normalize their outputs into a canonical schema and score where they diverge. High parser disagreement is itself a finding: it predicts that real-world ATSes will read your resume inconsistently.",
   },
   {
     q: 'What does disagreement actually tell me?',

@@ -3,14 +3,10 @@
 //   - app/api/upload-jd-image/route.ts (image-of-JD input on target form)
 //   - lib/extract-text.ts (PDF fallback when pdf-parse returns near-empty)
 //
-// M9.5: Hybrid OCR. For image MIME types (PNG/JPEG/GIF/WebP) we use Claude
-// Sonnet vision — reliable, no trial-tier flakiness, ~$0.005-0.01/call.
-// For PDFs we keep the legacy Affinda path because Claude vision doesn't
-// accept PDFs directly and converting PDF → image server-side would need a
-// canvas dependency we don't carry. Per-tenant Affinda issues (M7
-// KNOWN_ISSUES 2.2) only affected parsing, not OCR text extraction, so the
-// PDF fallback should still work — if it stops, we'd swap in pdf-to-image
-// → Claude vision in v2.
+// Both image and PDF paths go through Claude vision (image via type:'image',
+// PDF via type:'document'). Anthropic's SDK accepts PDFs natively, no
+// pdf-to-image conversion needed. Single API, single key (ANTHROPIC_API_KEY).
+// Affinda was retired here on 2026-05-16.
 //
 // Returns null when OCR is unavailable or the extracted text < 50 chars.
 // Callers treat null as "OCR could not help" and propagate a 422.
@@ -99,60 +95,57 @@ async function ocrImageViaClaude(
 }
 
 // ---------------------------------------------------------------------------
-// Affinda — legacy PDF OCR fallback
+// Claude vision — PDF path. Anthropic accepts PDFs directly via type:'document',
+// so we don't need pdf-to-image conversion. Same model + prompt as the image
+// path; the API just picks the right code path internally.
 // ---------------------------------------------------------------------------
 
-const AFFINDA_BASE = 'https://api.affinda.com/v3'
-
-interface AffindaTextResponse {
-  meta?: { rawText?: string }
-  data?: { rawText?: string; text?: string }
-}
-
-async function ocrPdfViaAffinda(
+async function ocrPdfViaClaude(
   buffer: Buffer,
-  fileName: string,
-  mimeType: string
+  fileName: string
 ): Promise<string | null> {
-  const apiKey = process.env.AFFINDA_API_KEY
-  if (!apiKey) return null
+  const client = getClient()
+  if (!client) {
+    console.warn('[ocr] ANTHROPIC_API_KEY not set — Claude PDF OCR unavailable')
+    return null
+  }
 
-  const formData = new FormData()
-  formData.append(
-    'file',
-    new Blob([new Uint8Array(buffer)], { type: mimeType }),
-    fileName
-  )
-  formData.append('wait', 'true')
-
-  let response: Response
   try {
-    response = await fetch(`${AFFINDA_BASE}/documents`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: formData,
+    const r = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4000,
+      temperature: 0,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'document',
+              source: {
+                type: 'base64',
+                media_type: 'application/pdf',
+                data: buffer.toString('base64'),
+              },
+            },
+            { type: 'text', text: OCR_PROMPT },
+          ],
+        },
+      ],
     })
+    const text = r.content[0]?.type === 'text' ? r.content[0].text : ''
+    if (!text || text.trim() === 'NO_TEXT_FOUND') {
+      console.warn(`[ocr] Claude returned no readable text for ${fileName}`)
+      return null
+    }
+    if (text.trim().length < MIN_USEFUL_CHARS) {
+      console.warn(`[ocr] Claude returned only ${text.trim().length} chars for ${fileName}`)
+      return null
+    }
+    return text
   } catch (err) {
-    console.warn('[ocr] Affinda network error:', err instanceof Error ? err.message : err)
+    console.warn('[ocr] Claude PDF vision error:', err instanceof Error ? err.message : err)
     return null
   }
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '')
-    console.warn(`[ocr] Affinda HTTP ${response.status}: ${detail.slice(0, 300)}`)
-    return null
-  }
-
-  let body: AffindaTextResponse
-  try {
-    body = (await response.json()) as AffindaTextResponse
-  } catch {
-    return null
-  }
-
-  const text = body.meta?.rawText ?? body.data?.rawText ?? body.data?.text ?? null
-  if (!text || text.trim().length < MIN_USEFUL_CHARS) return null
-  return text
 }
 
 // ---------------------------------------------------------------------------
@@ -167,5 +160,5 @@ export async function ocrDocument(
   if (mimeType.startsWith('image/')) {
     return ocrImageViaClaude(buffer, fileName, mimeType)
   }
-  return ocrPdfViaAffinda(buffer, fileName, mimeType)
+  return ocrPdfViaClaude(buffer, fileName)
 }

@@ -52,7 +52,7 @@ The aggregate nodes (`parse_resume`, `perceive_resume`) list all data sources as
 
 ```
 load_resume
- ├─ parse_{affinda,openresume,naive}    → parse_resume (aggregate)
+ ├─ parse_{openresume,naive,llm}        → parse_resume (aggregate)
  └─ perceive_{gpt4o,claude,gemini,llama} → perceive_resume (aggregate)
                                             │
 parse_resume   ─→ compute_disagreement     │

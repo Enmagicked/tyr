@@ -31,7 +31,6 @@ OPENAI_API_KEY
 ANTHROPIC_API_KEY
 GOOGLE_GENERATIVE_AI_API_KEY
 TOGETHER_API_KEY
-AFFINDA_API_KEY                   # optional — pipeline degrades gracefully if absent
 UPSTASH_REDIS_REST_URL
 UPSTASH_REDIS_REST_TOKEN
 STRIPE_SECRET_KEY                 # sk_live_... from Stripe Dashboard → Developers → API keys
@@ -152,7 +151,6 @@ OPENAI_API_KEY                        sk-...                  ← mark Sensitive
 ANTHROPIC_API_KEY                     sk-ant-...              ← mark Sensitive
 GOOGLE_GENERATIVE_AI_API_KEY          ...                     ← mark Sensitive
 TOGETHER_API_KEY                      ...                     ← mark Sensitive
-AFFINDA_API_KEY                       ...                     ← mark Sensitive (optional)
 UPSTASH_REDIS_REST_URL                https://...upstash.io
 UPSTASH_REDIS_REST_TOKEN              ...                     ← mark Sensitive
 ```
