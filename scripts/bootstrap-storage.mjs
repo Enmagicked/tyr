@@ -21,7 +21,16 @@ async function ensureBucket(name) {
   const { error: createError } = await supabase.storage.createBucket(name, {
     public: false,
     fileSizeLimit: 10 * 1024 * 1024,
-    allowedMimeTypes: ['application/pdf'],
+    // PDFs from /upload, images from /upload (image path) + /upload-jd-image,
+    // and text/plain from /upload (URL ingest synth) + /api/builder (rebuild).
+    allowedMimeTypes: [
+      'application/pdf',
+      'text/plain',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/webp',
+    ],
   })
   if (createError) throw createError
   console.log(`created bucket '${name}'`)
