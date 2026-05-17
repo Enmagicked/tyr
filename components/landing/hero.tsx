@@ -139,7 +139,7 @@ export function Hero() {
             <Link
               href="/builder"
               onClick={() => posthog.capture('cta_click', { location: 'hero_secondary', destination: '/builder' })}
-              className="text-sm font-medium px-7 py-3 rounded-full bg-marigold/95 text-ink shadow-[0_4px_28px_rgba(15,24,48,.22)] hover:bg-marigold hover:scale-[1.025] hover:shadow-[0_6px_36px_rgba(15,24,48,.3)] transition-all duration-200"
+              className="text-sm font-medium px-7 py-3 rounded-full border border-thistle/60 bg-thistle/10 text-vellum hover:bg-thistle/25 hover:border-thistle transition-all duration-200"
             >
               No resume yet? Build one →
             </Link>

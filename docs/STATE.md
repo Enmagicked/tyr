@@ -1,10 +1,79 @@
 # tyr — current state
 
-> **Read this first** if you're a new Claude session. Updated 2026-05-15 mid-launch (M9.5 live, polish iteration in flight).
+> **Read this first** if you're a new Claude session. Updated 2026-05-16 post-paywall-rebuild + Affinda retirement.
 
 ---
 
-## ⚡ RESUME HERE (session handoff 2026-05-15, M9.5 in flight)
+## ⚡ RESUME HERE (session handoff 2026-05-16, paid-only launch in flight)
+
+**Paid-only product is live in code, smoke-testing in progress.** Free signup credit has been removed; $4 intro pack (first-purchase only) replaces it. Dedicated `/paywall` landing page with founder note replaces inline paywall modals. Migration `0011_paid_only_and_atomics.sql` MUST be applied to prod Supabase or every upload returns "Credit check failed" (the `consume_credit` RPC doesn't exist yet).
+
+### What changed since 2026-05-15
+
+**Pricing model (paid-only):**
+- Migration `0011` drops `credits_remaining` default to 0 (no more free signup credit)
+- Three tiers in `lib/stripe.ts`: **$4 intro** (first-purchase only, gated by `credits_purchased=0`), **$6 single**, **$15 bulk** (5 decodes)
+- Checkout API takes `{ tier, return_to }` instead of `{ credits }`. Server enforces first-purchase gate on intro tier
+- Stripe success/cancel URLs pinned to `NEXT_PUBLIC_SITE_URL` (no preview redirects)
+- New env var **`STRIPE_PRICE_INTRO`** must be set in Vercel
+- Builder route no longer has BUILDER_LOCKED branch — paid-only product makes the distinction moot
+
+**Security hardening (from subagent reviews 2026-05-16, see `docs/REVIEW_FINDINGS_2026-05-16.md`):**
+- **Webhook idempotency**: `processed_stripe_events(event_id PK)` table + insert-first-then-credit pattern. Was previously read-modify-write with a comment falsely claiming "Stripe idempotency prevents double-processing."
+- **Atomic credits**: New SQL RPCs `apply_credit_purchase`, `consume_credit`, `refund_credit`, `consume_builder_rewrite`. Replace all the read-then-write race-prone code in upload/builder/rewrite-bullet/webhook
+- **Rate limiting**: `lib/ratelimit.ts` + `@upstash/ratelimit` on analyze (10/min), upload (10/min), builder (5/min), builder_rewrite (30/min), builder_prefill (5/min), checkout (10/hour). Fail-open if Upstash unavailable
+- **SSRF DNS-rebinding closed**: `lib/ingest/url.ts` now pins TCP connect to pre-validated IP via undici `Agent`, uses `redirect: 'manual'` with per-hop re-validation
+- **Builder prompt injection defense**: `<user_input>` / `<original_bullet>` delimiters + system-prompt instruction-vs-data paragraph. Cache namespaces bumped to `builder:v2` / `builder_rewrite:v2`
+
+**Affinda fully retired (2026-05-16):**
+- `lib/parsers/affinda.ts` deleted (was dormant since M7 — never re-enabled)
+- `lib/ocr.ts` PDF OCR fallback switched from Affinda → Claude vision (`type: 'document'`). Anthropic accepts PDFs natively, no pdf-to-image needed. Same `ANTHROPIC_API_KEY`, single API.
+- `lib/agents/parsers.ts` `synthesizeParse` aggregator fixed: was reading dead `parse_affinda` key and **NOT reading `parse_llm`** — meaning since M9.5 the "3-parser" disagreement was actually running on 2. Now reads openresume + naive + llm correctly.
+- `AFFINDA_API_KEY` env var can be removed from Vercel; Affinda trial subscription can be cancelled.
+
+**Paywall UX overhaul:**
+- Dedicated `/paywall` route at `app/paywall/page.tsx` with founder-note card + 3-tier pricing
+- Anon users see "Sign up to continue" → `/signup?next=/paywall` → back to paywall after signup
+- Authed users see direct Buy buttons; tier shown depends on `credits_purchased` server-side
+- Inline paywall modals in upload-flow + builder-flow **deleted** — both flows now redirect to `/paywall?from=upload|builder` on 402
+
+**Sign-in / signup UX:**
+- Replaced `router.push()` with `window.location.href` for post-auth nav (was leaving button stuck on "Signing in…" while RSC streamed)
+- Two-stage loading: "Signing in…" → "Redirecting…"
+- Signup honors `?next=` query param so paywall → signup → paywall flow works
+
+**Color polish:**
+- Hero builder CTA changed from marigold pill to thistle outlined pill (loud yellow felt off)
+- Upload page "No resume yet?" link changed from marigold hover to thistle
+- Marigold preserved on /paywall intro button (primary buy CTA) + report chart accents (intentional design)
+
+### Critical files (post-2026-05-16)
+
+- `app/paywall/page.tsx` — dedicated landing page, auth-aware, founder note in card treatment
+- `components/paywall/paywall-buttons.tsx` — client component, tier-based, redirects anon to signup
+- `infra/supabase/migrations/0011_paid_only_and_atomics.sql` — **MUST be applied to prod** or every upload 500s
+- `lib/ratelimit.ts` — Upstash sliding-window per user per endpoint, fail-open
+- `lib/ocr.ts` — Claude vision for both image (`type:'image'`) and PDF (`type:'document'`) OCR
+- `lib/agents/parsers.ts` — `synthesizeParse` now correctly aggregates parse_llm
+- `lib/builder/prompts.ts` — `<user_input>` delimiters + injection defense, lockfile v2
+- `docs/REVIEW_FINDINGS_2026-05-16.md` — punch list of subagent findings + fix status
+
+### Prod state checklist (what you still need to do manually)
+
+- [ ] **Apply migration `0011` to prod Supabase** (SQL editor → paste file → run)
+- [x] `STRIPE_PRICE_INTRO` env var set in Vercel
+- [ ] Remove `AFFINDA_API_KEY` from Vercel (no longer read)
+- [ ] Cancel Affinda subscription
+- [ ] Smoke-test full flow: fresh signup → /upload → 402 → /paywall → $4 intro → Stripe → return to /upload → upload succeeds → /upload again → 402 → /paywall now shows $6 + $15 (intro hidden)
+
+### Open issues from prior session (unchanged)
+
+- Prefill extraction uses Haiku — partial extractions on some resumes (Sonnet timeouts blocked the upgrade). User said "taken care of" 2026-05-16.
+- Llama silent failures probably rate-limiting (32 parallel calls per upload) — see review M4 in REVIEW_FINDINGS doc.
+
+---
+
+## ⚡ PRIOR HANDOFF (2026-05-15, M9.5 in flight)
 
 **Launching today.** M9.5 (Activities Builder + internship preset + rebuild flow) is live on prod. The user has been iterating on polish/bugs all day. Most recent open item: prefill extraction quality — see "Open issues" below.
 

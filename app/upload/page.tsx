@@ -27,7 +27,7 @@ export default function UploadPage() {
             No resume yet?{' '}
             <Link
               href="/builder"
-              className="text-ink underline underline-offset-2 hover:text-marigold"
+              className="text-thistle underline underline-offset-2 hover:text-thistle/80"
             >
               Build one from your activities →
             </Link>
