@@ -47,7 +47,6 @@ type InputKind = 'pdf' | 'url' | 'image'
 
 const INPUT_TABS: { key: InputKind; label: string }[] = [
   { key: 'pdf', label: 'PDF' },
-  { key: 'url', label: 'URL' },
   { key: 'image', label: 'Image' },
 ]
 
