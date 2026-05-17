@@ -159,9 +159,18 @@ async function ensurePublicHost(hostname: string): Promise<void> {
 function pinnedDispatcher(ip: { address: string; family: 4 | 6 }) {
   return new Agent({
     connect: {
+      // undici v7 calls lookup with `{all: true}` and expects the array-style
+      // dns.lookup callback `(err, [{address, family}])`. Older callers use
+      // the 3-arg `(err, address, family)` form. Support both so the dispatcher
+      // doesn't silently hand undici `undefined` for the address.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      lookup: ((_hostname: string, _opts: unknown, cb: any) =>
-        cb(null, ip.address, ip.family)) as never,
+      lookup: ((_hostname: string, opts: any, cb: any) => {
+        if (opts && opts.all) {
+          cb(null, [{ address: ip.address, family: ip.family }])
+        } else {
+          cb(null, ip.address, ip.family)
+        }
+      }) as never,
     },
   })
 }
