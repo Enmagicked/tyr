@@ -172,7 +172,7 @@ async function handleBuilder(request: Request) {
   const { error: storageError } = await service.storage
     .from('resumes')
     .upload(filePath, Buffer.from(rawText, 'utf8'), {
-      contentType: 'text/plain; charset=utf-8',
+      contentType: 'text/plain',
       upsert: false,
     })
   if (storageError) {

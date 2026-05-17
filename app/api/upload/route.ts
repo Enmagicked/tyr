@@ -382,7 +382,7 @@ async function ingestFromUrl(formData: FormData): Promise<IngestResult> {
   return {
     raw_text: text,
     storage_buffer: buffer,
-    storage_mime: 'text/plain; charset=utf-8',
+    storage_mime: 'text/plain',
     file_name: fileName,
     source_url,
   }
